@@ -15,7 +15,7 @@ jobs:
     name: Build & publish
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the tag matches the crate version
         run: |
