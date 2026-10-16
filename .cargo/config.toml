@@ -1,0 +1,3 @@
+[alias]
+# Project tooling, e.g. `cargo xtask icon`. See xtask/src/main.rs.
+xtask = "run --quiet --package xtask --"
