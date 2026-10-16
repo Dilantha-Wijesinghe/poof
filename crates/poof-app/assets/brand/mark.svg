@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Poof mark: a soft cloud of storage dispersing into particles. -->
+  <defs>
+    <radialGradient id="back" cx="0.28" cy="0.72" r="0.95">
+      <stop offset="0" stop-color="#2f5bff"/>
+      <stop offset="0.55" stop-color="#5b8cff"/>
+      <stop offset="1" stop-color="#9be7f7"/>
+    </radialGradient>
+    <linearGradient id="wave" x1="0" y1="0.3" x2="1" y2="0.75">
+      <stop offset="0" stop-color="#d9ecff" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#5b7cff"/>
+      <stop offset="0.72" stop-color="#4c5cf5"/>
+      <stop offset="1" stop-color="#c4b1fb"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="dotCyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7fe3f5"/>
+      <stop offset="1" stop-color="#3fb0f2"/>
+    </linearGradient>
+    <linearGradient id="dotSky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fb3ff"/>
+      <stop offset="1" stop-color="#4f86f7"/>
+    </linearGradient>
+    <linearGradient id="dotViolet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b8a2fb"/>
+      <stop offset="1" stop-color="#7c6cf5"/>
+    </linearGradient>
+  </defs>
+  <circle cx="42" cy="44" r="23" fill="url(#back)"/>
+  <path d="M14 64 C14 50 27 44 38 47.5 C50 51.5 55 66 63 70.5 C69 74 75.5 70 78.5 64.5
+           C80.5 78 70 89 56 89 C46 89 40.5 83 33.5 83 C22 83 14 75.5 14 64 Z" fill="url(#wave)"/>
+  <path d="M14 64 C14 50 27 44 38 47.5 C46 50 50 56 54 62 C44 56 30 54 22 60 C18 63 16 66 14.4 69 Z"
+        fill="url(#sheen)"/>
+  <circle cx="79" cy="19" r="7" fill="url(#dotViolet)"/>
+  <circle cx="64.5" cy="31" r="5.6" fill="url(#dotCyan)"/>
+  <circle cx="89" cy="33" r="4.3" fill="url(#dotViolet)"/>
+  <circle cx="76" cy="40.5" r="5" fill="url(#dotSky)"/>
+  <circle cx="64" cy="46" r="3.9" fill="#a9dcfb"/>
+  <circle cx="85" cy="50" r="3.9" fill="url(#dotCyan)"/>
+  <circle cx="70" cy="57.5" r="5.4" fill="url(#dotSky)"/>
+  <circle cx="83.5" cy="62" r="2.2" fill="#7fe3f5"/>
+</svg>
