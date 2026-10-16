@@ -6,7 +6,7 @@ correctness and safety come before features.
 ## Development setup
 
 ```sh
-rustup toolchain install stable --component clippy rustfmt
+# rust-toolchain.toml pins the Rust version; rustup installs it on first use.
 cargo run -p poof                      # run the app (debug)
 cargo test --workspace                 # all tests
 cargo clippy --workspace --all-targets -- -D warnings

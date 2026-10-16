@@ -124,6 +124,6 @@ mod tests {
         let mut found = glob(&dir.path().join("*/Cache"));
         found.sort();
         assert_eq!(found, vec![dir.path().join("Code/Cache"), dir.path().join("Slack/Cache")]);
-        assert!(glob(&dir.path().join("missing/*")).is_empty());
+        assert_eq!(glob(&dir.path().join("missing/*")), Vec::<PathBuf>::new());
     }
 }

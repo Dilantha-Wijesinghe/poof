@@ -1,0 +1,6 @@
+# One toolchain for local builds and CI, so lints never differ between them.
+# Bump deliberately (and fix any new lints) rather than tracking `stable`.
+[toolchain]
+channel = "1.99"
+components = ["clippy", "rustfmt"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]

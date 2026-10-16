@@ -119,6 +119,6 @@ mod tests {
         // A cutoff in the past makes every project "active".
         let mut found = Vec::new();
         search(dir.path(), 0, 0, &mut found);
-        assert!(found.is_empty());
+        assert_eq!(found, Vec::<PathBuf>::new());
     }
 }

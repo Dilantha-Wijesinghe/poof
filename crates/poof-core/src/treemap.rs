@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn degenerate_inputs_produce_empty_rectangles() {
-        assert!(squarify(&[], BOUNDS).is_empty());
+        assert_eq!(squarify(&[], BOUNDS), Vec::<Rect>::new());
         assert_eq!(squarify(&[0, 0], BOUNDS), vec![Rect::default(); 2]);
         assert_eq!(squarify(&[5], Rect::default()), vec![Rect::default()]);
         let with_zero = squarify(&[5, 0], BOUNDS);

@@ -7,3 +7,6 @@
 *.p12
 *.key
 codesign-password.txt
+
+# Personal Claude Code settings
+.claude/settings.local.json

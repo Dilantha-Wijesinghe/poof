@@ -296,7 +296,7 @@ mod tests {
         let a = tree.children(tree.root()).find(|(_, n)| &*n.name == "a").unwrap().1;
         // `a` is below the threshold so its two files are summarised, not listed.
         assert_eq!(a.files, 2);
-        assert!(a.children.is_empty());
+        assert_eq!(a.children, Vec::<NodeId>::new());
     }
 
     #[test]

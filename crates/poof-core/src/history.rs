@@ -267,7 +267,7 @@ mod tests {
     fn small_changes_are_ignored() {
         let old = summary(1, &[("", gb(10))]);
         let new = summary(2, &[("", gb(10) + 5)]);
-        assert!(changes(&old, &new, gb(1)).is_empty());
+        assert_eq!(changes(&old, &new, gb(1)), Vec::<Change>::new());
     }
 
     #[test]

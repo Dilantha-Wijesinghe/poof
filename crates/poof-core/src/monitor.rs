@@ -177,7 +177,7 @@ fn label() -> String {
 }
 
 fn domain() -> String {
-    let uid = fs::metadata(paths::home()).map(|m| m.uid()).unwrap_or(501);
+    let uid = fs::metadata(paths::home()).map_or(501, |m| m.uid());
     format!("gui/{uid}")
 }
 

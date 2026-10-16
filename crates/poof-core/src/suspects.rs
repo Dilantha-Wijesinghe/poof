@@ -160,7 +160,7 @@ mod tests {
     fn measures_without_panicking() {
         // Results depend on the machine; the call itself must be robust.
         for m in measure() {
-            assert!(!m.locations.is_empty());
+            assert_ne!(m.locations, Vec::<PathBuf>::new());
         }
     }
 }
