@@ -20,6 +20,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 objc2.workspace = true
 objc2-foundation.workspace = true
+objc2-app-kit.workspace = true
 
 [dev-dependencies]
 minisign.workspace = true

@@ -11,6 +11,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::apps::normalize;
 use crate::{paths, system, time};
 
 /// Where per-app data lives, and the suffix to strip to get the bundle id.
@@ -85,11 +86,6 @@ impl Known {
             && vendor(id).is_some_and(|v| !self.vendors.contains(&v))
             && !self.products.contains(&product)
     }
-}
-
-/// `Draw-Things`, `draw things` → `drawthings`.
-fn normalize(name: &str) -> String {
-    name.chars().filter(char::is_ascii_alphanumeric).map(|c| c.to_ascii_lowercase()).collect()
 }
 
 /// `com.Vendor.App.helper` → `com.vendor`.

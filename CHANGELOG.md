@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Clean Up leaves out the data of apps that are open, such as a running
+  browser's cache, and says so before cleaning. Quit the app and clean again
+  to include it.
+
 ### Fixed
 
 - The update dialog now shows release notes that wrap over several lines in

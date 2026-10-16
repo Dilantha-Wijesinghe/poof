@@ -2,14 +2,16 @@
 //!
 //! Nothing is removed without an explicit selection and confirmation.
 //! "Safe" items are preselected because they regenerate on their own;
-//! "Review" items never are.
+//! "Review" items never are. Data of apps that are open is left alone until
+//! they are quit, since removing it under a running app can confuse it.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 use iced::widget::{button, checkbox, column, container, row, space, text};
 use iced::{Alignment, Element, Fill, Task};
-use poof_core::cleanup::{self, CATALOG, Category, Finding, Safety};
+use poof_core::apps::{self, App};
+use poof_core::cleanup::{self, CATALOG, Candidate, Category, Finding, Safety};
 use poof_core::remove::{self, Item, Method};
 use poof_core::settings::Settings;
 use poof_core::size::ByteSize;
@@ -35,6 +37,8 @@ pub struct State {
     expanded: HashSet<&'static str>,
     confirming: bool,
     cleaning: bool,
+    /// Apps open when the user last asked to clean.
+    open_apps: Vec<App>,
 }
 
 #[derive(Debug, Clone)]
@@ -77,12 +81,22 @@ impl State {
         self.selected_items().map(|(_, c)| c.size).sum()
     }
 
-    fn selected_items(&self) -> impl Iterator<Item = (&Finding, &cleanup::Candidate)> {
+    fn selected_items(&self) -> impl Iterator<Item = (&Finding, &Candidate)> {
         self.findings
             .iter()
             .flatten()
             .flat_map(|f| f.items.iter().map(move |c| (f, c)))
             .filter(|(_, c)| self.selected.contains(&c.path))
+    }
+
+    /// The open app that `candidate` belongs to.
+    fn open_owner(&self, candidate: &Candidate) -> Option<&App> {
+        apps::owner(&candidate.path, &self.open_apps)
+    }
+
+    /// Whether `candidate` is removed by the next clean-up.
+    fn will_clean(&self, candidate: &Candidate) -> bool {
+        self.selected.contains(&candidate.path) && self.open_owner(candidate).is_none()
     }
 
     fn finding(&self, id: &str) -> Option<&Finding> {
@@ -132,6 +146,7 @@ impl State {
                 Action::none()
             }
             Message::Clean => {
+                self.open_apps = apps::running();
                 self.confirming = self.selected_bytes() > 0;
                 Action::none()
             }
@@ -140,6 +155,11 @@ impl State {
                 Action::none()
             }
             Message::Confirm => {
+                // An app may have been opened while the dialog was up.
+                self.open_apps = apps::running();
+                if !self.selected_items().any(|(_, c)| self.will_clean(c)) {
+                    return Action::none();
+                }
                 self.confirming = false;
                 self.cleaning = true;
                 let to_trash = settings.cleanup_to_trash;
@@ -153,7 +173,7 @@ impl State {
                         let items = f
                             .items
                             .iter()
-                            .filter(|c| self.selected.contains(&c.path))
+                            .filter(|c| self.will_clean(c))
                             .map(|c| Item { path: c.path.clone(), size: c.size })
                             .collect();
                         (method, items)
@@ -192,26 +212,42 @@ impl State {
         if !self.confirming {
             return None;
         }
-        let mut per_rule: Vec<(&str, u64)> = Vec::new();
-        let mut needs_review = false;
-        for (finding, candidate) in self.selected_items() {
-            needs_review |= finding.rule.safety == Safety::Review;
-            match per_rule.iter_mut().find(|(name, _)| *name == finding.rule.name) {
-                Some(entry) => entry.1 += candidate.size,
-                None => per_rule.push((finding.rule.name, candidate.size)),
-            }
+        let held = totals(
+            self.selected_items().filter_map(|(_, c)| Some((self.open_owner(c)?.name.as_str(), c.size))),
+        );
+        let cleaning: Vec<(&Finding, &Candidate)> =
+            self.selected_items().filter(|(_, c)| self.will_clean(c)).collect();
+        let open = and_list(held.iter().map(|(name, _)| *name));
+        let (them, are) = if held.len() == 1 { ("it", "is") } else { ("them", "are") };
+
+        if cleaning.is_empty() {
+            return Some(Dialog {
+                title: format!("Quit {open} first"),
+                message: format!(
+                    "Everything you selected belongs to {open}. Removing an app's data while it's \
+                     open can make it misbehave. Quit {them}, then check again."
+                ),
+                details: listing(&held),
+                confirm: "Check Again".into(),
+                destructive: false,
+                on_confirm: Message::Clean,
+                on_cancel: Message::Cancel,
+            });
         }
-        per_rule.sort_by_key(|(_, bytes)| std::cmp::Reverse(*bytes));
-        let mut details: Vec<String> =
-            per_rule.iter().take(6).map(|(name, bytes)| format!("{name}: {}", ByteSize(*bytes))).collect();
-        if per_rule.len() > 6 {
-            details.push(format!("and {} more", per_rule.len() - 6));
-        }
-        if needs_review {
+
+        let per_rule = totals(cleaning.iter().map(|(f, c)| (f.rule.name, c.size)));
+        let mut details = listing(&per_rule);
+        if cleaning.iter().any(|(f, _)| f.rule.safety == Safety::Review) {
             details.push("Some items are marked Review. Make sure you don't need them.".into());
         }
+        if !held.is_empty() {
+            let bytes = ByteSize(held.iter().map(|(_, b)| b).sum());
+            details.push(format!(
+                "Leaving out {bytes} that belongs to {open}, which {are} open. Quit {them} and clean again to include it."
+            ));
+        }
         Some(Dialog {
-            title: format!("Clean up {}?", ByteSize(self.selected_bytes())),
+            title: format!("Clean up {}?", ByteSize(cleaning.iter().map(|(_, c)| c.size).sum())),
             message: "Apps recreate caches and build files when they need them. \
                       Each removed item is listed in ~/Library/Logs/Poof/operations.log."
                 .into(),
@@ -379,5 +415,100 @@ impl State {
             .then(|| caption(format!("and {} smaller items", finding.items.len() - MAX_ITEMS)));
         let list = container(items.push(more)).padding([8, 12]).width(Fill).style(style::well);
         column![header, row![space().width(30), list]].spacing(gap::M).into()
+    }
+}
+
+/// Sums sizes per name, largest first.
+fn totals<'a>(entries: impl Iterator<Item = (&'a str, u64)>) -> Vec<(&'a str, u64)> {
+    let mut totals: Vec<(&str, u64)> = Vec::new();
+    for (name, bytes) in entries {
+        match totals.iter_mut().find(|(n, _)| *n == name) {
+            Some(entry) => entry.1 += bytes,
+            None => totals.push((name, bytes)),
+        }
+    }
+    totals.sort_by_key(|(_, bytes)| std::cmp::Reverse(*bytes));
+    totals
+}
+
+/// Dialog lines for `totals`, at most six of them.
+fn listing(totals: &[(&str, u64)]) -> Vec<String> {
+    let mut lines: Vec<String> =
+        totals.iter().take(6).map(|(name, bytes)| format!("{name}: {}", ByteSize(*bytes))).collect();
+    if totals.len() > 6 {
+        lines.push(format!("and {} more", totals.len() - 6));
+    }
+    lines
+}
+
+/// `["A", "B", "C"]` → `"A, B and C"`.
+fn and_list<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    let names: Vec<&str> = names.collect();
+    match names.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => names.concat(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A state with one "user-caches" item per path, all selected, and Slack open.
+    fn state(caches: &[&str]) -> State {
+        let rule = CATALOG.iter().find(|r| r.id == "user-caches").unwrap();
+        let items: Vec<Candidate> = caches
+            .iter()
+            .map(|name| Candidate {
+                path: paths::expand(&format!("~/Library/Caches/{name}")),
+                size: 1_000_000,
+                modified: 0,
+            })
+            .collect();
+        State {
+            selected: items.iter().map(|c| c.path.clone()).collect(),
+            findings: Some(vec![Finding { rule, items, unreadable: false }]),
+            open_apps: vec![App {
+                name: "Slack".into(),
+                id: "com.tinyspeck.slackmacgap".into(),
+                path: "/Applications/Slack.app".into(),
+            }],
+            confirming: true,
+            ..State::default()
+        }
+    }
+
+    #[test]
+    fn open_apps_data_is_left_out() {
+        let dialog = state(&["com.tinyspeck.slackmacgap", "com.example.other"]).dialog().unwrap();
+        assert_eq!(dialog.title, "Clean up 1.00 MB?");
+        assert!(
+            dialog
+                .details
+                .last()
+                .unwrap()
+                .starts_with("Leaving out 1.00 MB that belongs to Slack, which is open.")
+        );
+    }
+
+    #[test]
+    fn asks_to_quit_when_only_open_apps_data_is_selected() {
+        let dialog = state(&["com.tinyspeck.slackmacgap"]).dialog().unwrap();
+        assert_eq!(dialog.title, "Quit Slack first");
+        assert_eq!(dialog.confirm, "Check Again");
+        assert!(!dialog.destructive);
+    }
+
+    #[test]
+    fn totals_group_and_sort() {
+        let entries = [("a", 1), ("b", 5), ("a", 7)];
+        assert_eq!(totals(entries.into_iter()), [("a", 8), ("b", 5)]);
+    }
+
+    #[test]
+    fn names_are_listed_in_prose() {
+        assert_eq!(and_list([].into_iter()), "");
+        assert_eq!(and_list(["Slack"].into_iter()), "Slack");
+        assert_eq!(and_list(["Slack", "Chrome", "Edge"].into_iter()), "Slack, Chrome and Edge");
     }
 }

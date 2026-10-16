@@ -6,6 +6,7 @@
 //!
 //! | Module      | Responsibility                                               |
 //! |-------------|--------------------------------------------------------------|
+//! | [`apps`]    | Open apps, and which app a folder of data belongs to         |
 //! | [`scan`]    | Parallel directory walk into a compact, navigable [`scan::Tree`] |
 //! | [`cleanup`] | Declarative catalog of reclaimable locations and a finder    |
 //! | [`remove`]  | Guarded deletion (Trash or permanent) with an operations log |
@@ -17,6 +18,7 @@
 //! | [`treemap`] | Pure squarified treemap layout                               |
 //! | [`update`]  | Signed self-updates from GitHub Releases                     |
 
+pub mod apps;
 pub mod cleanup;
 pub mod error;
 pub mod history;
