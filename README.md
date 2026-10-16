@@ -22,6 +22,11 @@ You had 150 GB free last week. Today you have 35 GB, and you have no idea why.
 Poof answers that question in seconds, then helps you take the space back,
 safely.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/overview-dark.png">
+  <img src="docs/images/screenshots/overview-light.png" alt="Poof's Overview: available space, a free-space trend, and the usual suspects behind System Data">
+</picture>
+
 ## What it does
 
 - **Overview.** Shows how much space is used, purgeable and free, explained in
@@ -48,6 +53,32 @@ safely.
 - **Local snapshots.** See Time Machine's local snapshots and thin them with one
   click. Snapshots are a common reason deleting files seems to free nothing.
 
+## A closer look
+
+**Explore** maps a scan as a treemap, and flags what grew since the last one.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/explore-dark.png">
+  <img src="docs/images/screenshots/explore-light.png" alt="Explore: a treemap of the home folder next to a sorted list, with growth badges">
+</picture>
+
+**Changes** shows when free space dropped and which folders grew.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/changes-dark.png">
+  <img src="docs/images/screenshots/changes-light.png" alt="Changes: a falling free-space chart and the folders that grew in the past week">
+</picture>
+
+**Clean Up** lists what can go, marked Safe or Review, and removes only what
+you select.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/cleanup-dark.png">
+  <img src="docs/images/screenshots/cleanup-light.png" alt="Clean Up: reclaimable caches and logs grouped by category, each marked Safe or Review">
+</picture>
+
+The screenshots use a demo home folder, not anyone's real files.
+
 ## Safety first
 
 Most "Mac cleaner" apps have earned their bad reputation. Poof is built to be
@@ -56,6 +87,8 @@ the opposite:
 - **Nothing is removed without your explicit review and confirmation.** Only
   items marked **Safe** (data that rebuilds itself automatically) are
   preselected. **Review** items never are.
+- **Apps that are open keep their data.** Clean Up leaves out the caches of
+  running apps, such as your browser's, until you quit them.
 - **Explore always uses the Trash**, so anything you remove there can be put
   back.
 - **A hard-coded guard refuses protected locations.** That includes `/System`,
