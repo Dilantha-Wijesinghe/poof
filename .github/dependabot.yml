@@ -11,3 +11,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # Its version tags are Rust toolchains; the MSRV job pins one on purpose.
+      - dependency-name: dtolnay/rust-toolchain
