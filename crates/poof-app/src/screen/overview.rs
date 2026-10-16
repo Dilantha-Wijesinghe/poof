@@ -67,7 +67,7 @@ impl State {
                 self.thinning = false;
                 let toast = match &result {
                     Ok(()) => {
-                        Event::Toast("Asked Time Machine to thin local snapshots.".into(), Tone::Success)
+                        Event::Toast("Asked Time Machine to clear local snapshots.".into(), Tone::Success)
                     }
                     Err(e) => Event::Toast(format!("Could not thin snapshots: {e}"), Tone::Danger),
                 };
@@ -89,7 +89,7 @@ impl State {
     pub fn view<'a>(&'a self, shared: &'a Shared, reclaimable: Option<u64>) -> Element<'a, Message> {
         let header = page_header(
             "Overview",
-            "Where your storage stands, and where it went.",
+            "How much space you have and what's using it.",
             btn("Refresh", Some(Icon::Refresh), Kind::Secondary).on_press(Message::Refresh),
         );
 
@@ -111,7 +111,7 @@ impl State {
             .push(access)
             .push(hero(shared))
             .push(cards)
-            .push(section("Where space usually hides"))
+            .push(section("Common space hogs"))
             .push(self.suspects_card(shared))
             .spacing(gap::XL);
         page_scroll(content)
@@ -120,14 +120,14 @@ impl State {
     fn snapshot_card(&self) -> Element<'_, Message> {
         let (value, note, action): (String, String, Option<Message>) = match &self.snapshots {
             None => ("…".into(), "Checking Time Machine…".into(), None),
-            Some(Err(e)) => ("—".into(), format!("Couldn't list snapshots: {e}"), None),
+            Some(Err(e)) => ("Unknown".into(), format!("Couldn't list snapshots: {e}"), None),
             Some(Ok(list)) if list.is_empty() => {
-                ("None".into(), "Deleted files free their space right away.".into(), None)
+                ("None".into(), "Deleting files frees space right away.".into(), None)
             }
             Some(Ok(list)) => {
                 let oldest = list.iter().filter_map(|s| s.created).min();
                 let note = format!(
-                    "Oldest {}. Snapshots keep deleted files on disk until they expire.",
+                    "Oldest was taken {}. Until a snapshot expires, files you delete still take up space.",
                     oldest.map_or_else(|| "unknown".to_owned(), time::relative)
                 );
                 (list.len().to_string(), note, (!self.thinning).then_some(Message::ThinSnapshots))
@@ -145,7 +145,7 @@ impl State {
 
     fn suspects_card(&self, shared: &Shared) -> Element<'_, Message> {
         let Some(measured) = &self.suspects else {
-            return card(row![Icon::Search.view(16), muted("Measuring the usual suspects…")].spacing(gap::S))
+            return card(row![Icon::Search.view(16), muted("Checking common space hogs…")].spacing(gap::S))
                 .into();
         };
         let used = shared.volume.map_or(1, |v| v.used()).max(1);
@@ -154,7 +154,7 @@ impl State {
             col.push(suspect_row(m, used))
         });
         card(column![
-            muted("Measured directly — no scan needed. Many of these are best cleaned from the app that owns them."),
+            muted("These are measured directly, so no scan is needed. Most are best cleaned up from inside the app that created them."),
             space().height(gap::S),
             rows
         ])
@@ -171,7 +171,7 @@ fn reclaim_card<'a>(reclaimable: Option<u64>) -> Element<'a, Message> {
         Icon::Sparkles,
         "Ready to clean",
         value,
-        "Caches, logs and build files that rebuild themselves.",
+        "Caches, logs and build files. Apps recreate these when needed.",
         btn("Review", None, Kind::Primary).on_press(Message::Go(Screen::Cleanup)),
     )
 }
@@ -221,7 +221,7 @@ fn hero<'a>(shared: &Shared) -> Element<'a, Message> {
 
     let explainer = (v.purgeable() > gb(1)).then(|| {
         caption(format!(
-            "{} is purgeable: local snapshots, iCloud files and caches macOS removes automatically when space runs low.",
+            "Purgeable space ({}) counts as available. macOS clears it when it needs room, usually by removing local snapshots, iCloud downloads and caches.",
             ByteSize(v.purgeable())
         ))
     });
@@ -239,12 +239,12 @@ fn trend_card(shared: &Shared) -> Element<'_, Message> {
         (Some(first), Some(last)) if week.len() > 1 => {
             let delta = last.available as i64 - first.available as i64;
             let tone = if delta < -(gb(1) as i64) { Tone::Danger } else { Tone::Success };
-            let since = time::relative(first.at);
-            (signed(delta), format!("Change in available space since {since}."), tone)
+            let since = time::date_time(first.at);
+            (signed(delta), format!("Change since {since}."), tone)
         }
         _ => (
-            "—".to_owned(),
-            "Poof records free space whenever it runs. More history appears over time.".into(),
+            "No data yet".to_owned(),
+            "Poof notes your free space each time it opens. Check back in a few days to see a trend.".into(),
             Tone::Neutral,
         ),
     };

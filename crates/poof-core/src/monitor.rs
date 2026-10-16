@@ -57,7 +57,7 @@ impl Alert {
     pub fn body(&self) -> String {
         match self {
             Alert::Dropped { available, .. } => {
-                format!("{} left. Open {APP_NAME} → Changes to see what grew.", ByteSize(*available))
+                format!("{} left. Open {APP_NAME} and check Changes to see what grew.", ByteSize(*available))
             }
             Alert::Low { available } => {
                 format!("Only {} available. Open {APP_NAME} to free up space.", ByteSize(*available))

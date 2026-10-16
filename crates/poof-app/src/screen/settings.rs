@@ -68,7 +68,10 @@ pub fn update(message: Message, current: &Settings) -> Action<Message> {
             return Action::none();
         }
         Message::MonitorFailed(e) => {
-            return Action::event(Event::Toast(format!("Background monitoring: {e}"), Tone::Danger));
+            return Action::event(Event::Toast(
+                format!("Couldn't change background monitoring: {e}"),
+                Tone::Danger,
+            ));
         }
     }
     Action::event(Event::SettingsChanged(next))
@@ -90,13 +93,13 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
         column![
             setting(
                 "Move cleaned items to the Trash",
-                "Safer, but space is only freed once you empty the Trash. When off, Clean Up deletes caches immediately.",
+                "Safer, but you only get the space back after emptying the Trash. When this is off, Clean Up deletes items right away.",
                 toggler(s.cleanup_to_trash).on_toggle(Message::CleanupToTrash).style(style::toggler),
             ),
             divider(),
             setting(
                 "Inactive project threshold",
-                "Build folders (node_modules, target, …) in projects untouched this long are offered for cleanup.",
+                "Projects you haven't changed in this long count as inactive, and their build folders (node_modules, target and so on) show up in Clean Up.",
                 pick_list(STALE_CHOICES, choice(&STALE_CHOICES, u64::from(s.stale_project_days)), Message::StaleDays)
                     .text_size(size::BODY)
                     .style(style::pick_list),
@@ -123,7 +126,7 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
             divider(),
             setting(
                 "Alert when available space falls below",
-                "macOS needs headroom for updates, swap and snapshots.",
+                "macOS needs free space for updates and virtual memory.",
                 pick_list(LOW_CHOICES, choice(&LOW_CHOICES, s.low_space_gb), Message::LowSpace)
                     .text_size(size::BODY)
                     .style(style::pick_list),
@@ -141,13 +144,13 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
         column![
             setting(
                 "Full Disk Access",
-                "Lets Poof measure Mail, Messages, Safari, the Trash and other apps' containers. Poof never reads file contents.",
+                "Lets Poof measure Mail, Messages, Safari, the Trash and other apps' data. Poof only reads file sizes, never what's inside.",
                 access_status,
             ),
             divider(),
             setting(
                 "Operations log",
-                "Every item Poof deletes or moves to the Trash is recorded, with its size and path.",
+                "A record of every item Poof has deleted or moved to the Trash, with its size and location.",
                 btn("Show Log", Some(Icon::FolderOpen), Kind::Secondary).on_press(Message::OpenLog),
             ),
         ]
@@ -157,7 +160,7 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
     let about = card(setting(
         "About",
         format!(
-            "{APP_NAME} {} · open source under the MIT license · no telemetry, ever.",
+            "{APP_NAME} {}. Open source under the MIT license. Poof doesn't collect any data.",
             env!("CARGO_PKG_VERSION")
         ),
         btn("GitHub", Some(Icon::ExternalLink), Kind::Secondary).on_press(Message::OpenRepository),
@@ -165,7 +168,7 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
 
     page_scroll(
         column![
-            page_header("Settings", "Make Poof work the way you like.", space()),
+            page_header("Settings", "Appearance, cleaning and monitoring options.", space()),
             column![section("General"), appearance].spacing(gap::S),
             column![section("Cleaning"), cleaning].spacing(gap::S),
             column![section("Monitoring"), monitoring].spacing(gap::S),

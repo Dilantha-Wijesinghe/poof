@@ -12,7 +12,7 @@ pub enum Error {
         source: io::Error,
     },
 
-    #[error("refusing to touch protected location {}", .0.display())]
+    #[error("{} is a protected location, so Poof won't remove it", .0.display())]
     Protected(PathBuf),
 
     #[error("{program} failed: {message}")]

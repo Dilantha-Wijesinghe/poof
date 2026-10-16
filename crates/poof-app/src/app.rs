@@ -10,6 +10,7 @@ use poof_core::settings::{Appearance, Settings};
 use poof_core::size::ByteSize;
 use poof_core::{monitor, system as mac, volume};
 
+use crate::icon::Icon;
 use crate::screen::{Action, Event, Screen, Shared, changes, cleanup, explore, overview, settings};
 use crate::style::{self, Tone, size, space as gap};
 use crate::widget::{self, caption};
@@ -40,6 +41,8 @@ const TOAST_DURATION: Duration = Duration::from_secs(5);
 pub enum Message {
     Navigate(Screen),
     SystemTheme(theme::Mode),
+    /// The sidebar's light/dark switch.
+    SetDark(bool),
     RefreshDisk,
     DiskRefreshed(Option<volume::VolumeInfo>, Vec<monitor::Sample>),
     Tick,
@@ -80,12 +83,16 @@ impl App {
     }
 
     pub fn theme(&self) -> Theme {
-        let dark = match self.shared.settings.appearance {
+        style::theme(self.is_dark())
+    }
+
+    /// Whether the dark theme is showing, after resolving "Match System".
+    fn is_dark(&self) -> bool {
+        match self.shared.settings.appearance {
             Appearance::System => self.system_dark,
             Appearance::Light => false,
             Appearance::Dark => true,
-        };
-        style::theme(dark)
+        }
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -108,6 +115,11 @@ impl App {
             Message::SystemTheme(mode) => {
                 self.system_dark = mode == theme::Mode::Dark;
                 Task::none()
+            }
+            Message::SetDark(dark) => {
+                let mut settings = self.shared.settings.clone();
+                settings.appearance = if dark { Appearance::Dark } else { Appearance::Light };
+                self.on_event(Event::SettingsChanged(settings))
             }
             Message::RefreshDisk => {
                 self.shared.full_disk_access = mac::has_full_disk_access();
@@ -168,10 +180,13 @@ impl App {
             Event::Removed { bytes, trashed, failed } => {
                 let message = match (trashed, failed) {
                     (true, 0) => {
-                        format!("Moved {} to the Trash. Empty the Trash to free it.", ByteSize(bytes))
+                        format!(
+                            "Moved {} to the Trash. Empty the Trash to get the space back.",
+                            ByteSize(bytes)
+                        )
                     }
                     (false, 0) => format!("Freed {}.", ByteSize(bytes)),
-                    (_, n) => format!("Removed {} · {n} item(s) could not be removed.", ByteSize(bytes)),
+                    (_, n) => format!("Removed {}. {n} item(s) couldn't be removed.", ByteSize(bytes)),
                 };
                 self.show_toast(message, if failed == 0 { Tone::Success } else { Tone::Warning });
                 Task::batch([
@@ -305,10 +320,18 @@ impl App {
         });
 
         container(
-            column![space().height(40), brand, space().height(gap::XL), nav, space::vertical()]
-                .push(disk)
-                .padding([gap::L, gap::M])
-                .width(Fill),
+            column![
+                space().height(40),
+                brand,
+                space().height(gap::XL),
+                nav,
+                space::vertical(),
+                self.theme_switch()
+            ]
+            .push(disk)
+            .spacing(gap::S)
+            .padding([gap::L, gap::M])
+            .width(Fill),
         )
         .width(224)
         .height(Fill)
@@ -317,11 +340,35 @@ impl App {
     }
 }
 
+impl App {
+    /// A two-segment sun/moon switch. Picking one overrides "Match System",
+    /// which stays available in Settings.
+    fn theme_switch(&self) -> Element<'_, Message> {
+        let dark = self.is_dark();
+        let segment = |icon: Icon, label: &'static str, for_dark: bool| {
+            let active = dark == for_dark;
+            let tint = if active { style::icon(|t| t.accent) } else { style::icon(|t| t.muted) };
+            let content = row![icon.view(14).style(tint), text(label).size(size::CAPTION).font(font::MEDIUM)]
+                .spacing(6)
+                .align_y(Alignment::Center);
+            button(container(content).center_x(Fill))
+                .width(Fill)
+                .padding([5, 0])
+                .style(style::nav_item(active))
+                .on_press(Message::SetDark(for_dark))
+        };
+        container(row![segment(Icon::Sun, "Light", false), segment(Icon::Moon, "Dark", true)].spacing(2))
+            .padding(3)
+            .style(style::well)
+            .into()
+    }
+}
+
 fn toast_view(toast: &Toast) -> Element<'_, Message> {
     let tone = toast.tone;
     let icon = match tone {
-        Tone::Success => crate::icon::Icon::Check,
-        _ => crate::icon::Icon::AlertTriangle,
+        Tone::Success => Icon::Check,
+        _ => Icon::AlertTriangle,
     };
     let bubble = container(
         row![

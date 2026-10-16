@@ -13,7 +13,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "user-caches",
         name: "Application caches",
-        description: "Temporary data apps keep to load faster. Apps rebuild it on demand.",
+        description: "Temporary files apps keep so they load faster. They're rebuilt when needed.",
         category: Category::System,
         safety: Safety::Safe,
         source: Source::Contents(&["~/Library/Caches"]),
@@ -22,7 +22,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "user-logs",
         name: "Logs & crash reports",
-        description: "Diagnostic logs written by apps and macOS. Only useful when troubleshooting.",
+        description: "Diagnostic logs from apps and macOS. Mostly useful for troubleshooting.",
         category: Category::System,
         safety: Safety::Safe,
         source: Source::Contents(&["~/Library/Logs"]),
@@ -72,7 +72,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "webapp-caches",
         name: "Web-app caches",
-        description: "Browser-engine caches inside apps like Slack, Discord, VS Code, Teams and Notion.",
+        description: "Cached web data inside apps like Slack, Discord, VS Code, Teams and Notion.",
         category: Category::Apps,
         safety: Safety::Safe,
         source: Source::Paths(&[
@@ -96,7 +96,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "app-leftovers",
         name: "Leftovers from removed apps",
-        description: "Data, settings and web storage left by apps that are no longer installed.",
+        description: "Settings and data left behind by apps you've deleted.",
         category: Category::Apps,
         safety: Safety::Review,
         source: Source::Leftovers,
@@ -105,7 +105,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "ios-backups",
         name: "iPhone & iPad backups",
-        description: "Local device backups made by Finder. Keep any you still need; iCloud backups are unaffected.",
+        description: "Backups of your devices made through Finder. Keep any you still need. iCloud backups aren't affected.",
         category: Category::Apps,
         safety: Safety::Review,
         source: Source::Contents(&["~/Library/Application Support/MobileSync/Backup"]),
@@ -138,7 +138,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "xcode-archives",
         name: "Xcode archives",
-        description: "App archives created for distribution. Keep the ones you may need to symbolicate.",
+        description: "Archives of builds you distributed. Keep any you might need for reading crash reports.",
         category: Category::Developer,
         safety: Safety::Review,
         source: Source::Contents(&["~/Library/Developer/Xcode/Archives"]),
@@ -156,7 +156,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "homebrew-cache",
         name: "Homebrew downloads",
-        description: "Bottles and source archives Homebrew already installed.",
+        description: "Downloads Homebrew keeps after installing packages.",
         category: Category::Developer,
         safety: Safety::Safe,
         source: Source::Paths(&["~/Library/Caches/Homebrew"]),
@@ -217,7 +217,7 @@ pub static CATALOG: &[Rule] = &[
     Rule {
         id: "xdg-cache",
         name: "Command-line tool caches",
-        description: "The ~/.cache folder used by CLI tools. May include downloaded ML models that are slow to fetch again.",
+        description: "The ~/.cache folder used by command-line tools. It can hold large downloaded models that take a while to fetch again.",
         category: Category::Developer,
         safety: Safety::Review,
         source: Source::Contents(&["~/.cache"]),

@@ -42,7 +42,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - a protected-path guard
   - Trash-only removal in Explore
   - an operations log at `~/Library/Logs/Poof/operations.log`
-- Light and dark themes that follow the system.
+- Light and dark themes that follow the system, with a Light/Dark switch in
+  the sidebar.
 - A universal (Apple silicon + Intel) `.app`, `.dmg` and `.zip` via
   `scripts/bundle.sh` and GitHub Actions.
 

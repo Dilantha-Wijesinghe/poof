@@ -128,7 +128,7 @@ impl State {
         };
         let header = page_header(
             "Changes",
-            "How free space moved over time, and exactly what grew.",
+            "Track free space over time and see which folders grew.",
             row![scope_button(Scope::Home), scope_button(Scope::Disk)].spacing(gap::XS),
         );
 
@@ -136,8 +136,8 @@ impl State {
             banner(
                 Icon::Bell,
                 Tone::Accent,
-                "Never be surprised by a full disk again",
-                "Turn on background monitoring to be notified when free space drops suddenly.",
+                "Turn on background monitoring",
+                "Poof will check free space every 30 minutes and let you know if it drops quickly.",
                 Some(btn("Settings", None, Kind::Secondary).on_press(Message::OpenSettings).into()),
             )
         });
@@ -158,7 +158,7 @@ impl State {
                     Icon::History,
                     "No scans yet",
                     format!(
-                        "Scan {} once now and again later. Poof will show exactly which folders grew in between.",
+                        "Scan {} now, then again later on. Poof compares the two and shows which folders grew.",
                         scope.label()
                     ),
                     "Scan Now",
@@ -167,7 +167,7 @@ impl State {
                     Icon::Clock,
                     "One scan so far",
                     format!(
-                        "Scan again later, or whenever space drops unexpectedly, to see what changed since {}.",
+                        "Scan again later, or whenever space drops, to see what changed since {}.",
                         time::date_time(only.taken_at)
                     ),
                     "Scan Again",
@@ -242,13 +242,13 @@ fn change_row<'a>(root: &std::path::Path, scope: Scope, change: &'a Change) -> E
     let grew = change.attributed > 0;
     let path = root.join(&change.path);
     let name = if change.path.is_empty() {
-        format!("Spread across {}", scope.label())
+        format!("Small changes across {}", scope.label())
     } else {
         paths::display(&path)
     };
     let mut detail = format!("{} → {}", ByteSize(change.before), ByteSize(change.after));
     if change.spread {
-        detail.push_str(" · includes many smaller items");
+        detail.push_str(" · spread over many small items");
     }
     let (icon, tone) = if grew { (Icon::ArrowUp, Tone::Warning) } else { (Icon::ArrowDown, Tone::Success) };
     row![
@@ -293,7 +293,7 @@ fn timeline(shared: &Shared) -> Element<'_, Message> {
         }
         _ => column![
             header,
-            muted("Poof records available space every time it runs, and every 30 minutes with background monitoring on. The chart fills in over time."),
+            muted("Poof saves your free space each time it opens, or every 30 minutes with background monitoring on. The chart fills in as it collects more."),
         ]
         .spacing(gap::S)
         .into(),

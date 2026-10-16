@@ -203,17 +203,17 @@ impl State {
         }
         per_rule.sort_by_key(|(_, bytes)| std::cmp::Reverse(*bytes));
         let mut details: Vec<String> =
-            per_rule.iter().take(6).map(|(name, bytes)| format!("{name} — {}", ByteSize(*bytes))).collect();
+            per_rule.iter().take(6).map(|(name, bytes)| format!("{name}: {}", ByteSize(*bytes))).collect();
         if per_rule.len() > 6 {
             details.push(format!("and {} more", per_rule.len() - 6));
         }
         if needs_review {
-            details.push("Includes items marked Review: make sure you don't need them.".into());
+            details.push("Some items are marked Review. Make sure you don't need them.".into());
         }
         Some(Dialog {
             title: format!("Clean up {}?", ByteSize(self.selected_bytes())),
-            message: "Caches and build files are recreated automatically when needed. \
-                      Every removal is recorded in ~/Library/Logs/Poof/operations.log."
+            message: "Apps recreate caches and build files when they need them. \
+                      Each removed item is listed in ~/Library/Logs/Poof/operations.log."
                 .into(),
             details,
             confirm: "Clean Up".into(),
@@ -235,14 +235,14 @@ impl State {
         ]
         .spacing(gap::S);
         let header =
-            page_header("Clean Up", "Remove junk macOS and your apps leave behind — safely.", actions);
+            page_header("Clean Up", "Clear out caches, logs and other files your Mac doesn't need.", actions);
 
         let Some(findings) = &self.findings else {
             return column![
                 container(header).padding([8, 32]),
                 empty_state::<Message>(
                     Icon::Search,
-                    "Looking for reclaimable space…",
+                    "Looking for files you can remove…",
                     "This usually takes a few seconds.",
                     None
                 ),
@@ -255,7 +255,7 @@ impl State {
                 empty_state(
                     Icon::Check,
                     "Nothing to clean",
-                    "Your caches and build folders are already tidy.",
+                    "Poof didn't find any caches or build files worth removing.",
                     None
                 ),
             ]
@@ -264,9 +264,9 @@ impl State {
 
         let found: u64 = findings.iter().map(Finding::total).sum();
         let mode = if shared.settings.cleanup_to_trash {
-            "Items will be moved to the Trash (change this in Settings)."
+            "Selected items go to the Trash. You can change this in Settings."
         } else {
-            "Items are deleted permanently to free space immediately (change this in Settings)."
+            "Selected items are deleted right away instead of going to the Trash. You can change this in Settings."
         };
         let summary = card(
             column![

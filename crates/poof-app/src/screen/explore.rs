@@ -240,8 +240,8 @@ impl State {
             title: format!("Move “{}” to the Trash?", node.name),
             message: format!("{} · {}", ByteSize(node.size), paths::display(&browser.tree.path(id))),
             details: vec![
-                "You can put it back from the Trash until the Trash is emptied.".into(),
-                "The space is freed once you empty the Trash (Clean Up → Trash).".into(),
+                "You can restore it from the Trash until you empty it.".into(),
+                "You get the space back when you empty the Trash.".into(),
             ],
             confirm: "Move to Trash".into(),
             destructive: false,
@@ -403,7 +403,7 @@ impl Browser {
             button(
                 row![
                     Icon::Lock.view(13).style(style::icon_tone(Tone::Warning)),
-                    caption(format!("{} folders couldn't be read — grant access", tree.unreadable)),
+                    caption(format!("Couldn't read {} folders. Click to give access.", tree.unreadable)),
                 ]
                 .spacing(6)
                 .align_y(Alignment::Center),
@@ -536,7 +536,7 @@ impl Browser {
                 .align_y(Alignment::Center)
                 .into()
             }
-            None => caption("Hover the map to inspect · click a folder to open it").into(),
+            None => caption("Hover over the map for details. Click a folder to open it.").into(),
         };
         container(content).height(22).align_y(Alignment::Center).into()
     }
@@ -572,14 +572,14 @@ fn idle_view(shared: &Shared) -> Element<'_, Message> {
         tile(
             Icon::Folder,
             "Home folder",
-            "Your files, app data, caches and developer tools. Fast and the best place to start.",
+            "Your files, app data and caches. Quick to scan and a good place to start.",
             last_scan(&Target::Home),
             Message::Start(Target::Home),
         ),
         tile(
             Icon::Disk,
             "Macintosh HD",
-            "Everything on the data volume, including other users and system data.",
+            "The whole disk, including other users' files and system data. Takes longer.",
             format!("{}{used}", last_scan(&Target::Disk)),
             Message::Start(Target::Disk),
         ),
@@ -597,16 +597,16 @@ fn idle_view(shared: &Shared) -> Element<'_, Message> {
         banner(
             Icon::Lock,
             Tone::Warning,
-            "Some folders will be hidden without Full Disk Access",
-            "Scans still work, but protected folders show up as unreadable.",
+            "Some folders can't be read yet",
+            "Scans still work, but folders macOS protects are skipped until you give Poof Full Disk Access.",
             Some(btn("Open Settings", None, Kind::Secondary).on_press(Message::GrantAccess).into()),
         )
     });
 
-    column![page_header("Explore", "See exactly what's using space, folder by folder.", space())]
+    column![page_header("Explore", "Scan a folder to see what's taking up space.", space())]
         .push(access)
         .push(tiles)
-        .push(caption("Each scan is saved as a compact summary so Poof can show what changed next time."))
+        .push(caption("Poof keeps a small summary of each scan so it can show you what changed next time."))
         .spacing(gap::XL)
         .padding(Padding { top: 8.0, right: 32.0, bottom: 32.0, left: 32.0 })
         .into()
