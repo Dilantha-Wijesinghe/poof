@@ -9,6 +9,7 @@ mod icon;
 mod screen;
 mod style;
 mod task;
+mod updater;
 mod widget;
 
 use poof_core::monitor;

@@ -45,6 +45,8 @@ pub struct Settings {
     pub low_space_gb: u64,
     /// Project build folders untouched for this many days are offered for cleanup.
     pub stale_project_days: u32,
+    /// Check GitHub for a newer version once a day.
+    pub check_for_updates: bool,
 }
 
 impl Default for Settings {
@@ -56,6 +58,7 @@ impl Default for Settings {
             alert_drop_gb: 10,
             low_space_gb: 20,
             stale_project_days: 30,
+            check_for_updates: true,
         }
     }
 }

@@ -15,6 +15,7 @@
 //! | [`system`]  | APFS snapshots, Full Disk Access, Finder and notifications   |
 //! | [`suspects`]| Known hidden space hogs ("System Data") measured directly    |
 //! | [`treemap`] | Pure squarified treemap layout                               |
+//! | [`update`]  | Signed self-updates from GitHub Releases                     |
 
 pub mod cleanup;
 pub mod error;
@@ -30,6 +31,7 @@ pub mod suspects;
 pub mod system;
 pub mod time;
 pub mod treemap;
+pub mod update;
 pub mod volume;
 
 pub use error::{Error, Result};

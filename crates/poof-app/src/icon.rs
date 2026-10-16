@@ -30,6 +30,7 @@ icons! {
     ChevronRight => "chevron-right",
     Clock => "clock",
     Disk => "hard-drive",
+    Download => "download",
     ExternalLink => "external-link",
     File => "file",
     FileBox => "file-box",

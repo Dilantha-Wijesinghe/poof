@@ -66,8 +66,9 @@ the opposite:
   never flagged.
 - **Every removal is logged** to `~/Library/Logs/Poof/operations.log` with its
   size and path.
-- **Poof never reads file contents**, never phones home, and has no telemetry,
-  accounts or ads.
+- **Poof never reads file contents** and has no telemetry, accounts or ads.
+  Its only network request is a once-a-day update check to GitHub, which you
+  can turn off in Settings.
 - **It's fully open source** (MIT), so you can audit exactly what it does. See
   [SECURITY.md](SECURITY.md).
 
@@ -91,11 +92,19 @@ the opposite:
 4. For complete results, grant **Full Disk Access**: System Settings → Privacy
    & Security → Full Disk Access → add Poof. Poof links you straight there.
    Without it, Mail, Messages, Safari, the Trash and other apps' data can't be
-   measured. Until Poof is signed with a Developer ID, macOS may forget this
-   permission after an update. If the banner comes back, toggle Poof off and
-   on again in that list.
+   measured. Releases are signed with a stable certificate, so this
+   permission carries over to future updates.
 
 Verify a download with the `SHA256SUMS.txt` attached to each release.
+
+### Updates
+
+Poof checks for new versions once a day. When one is out, a notice appears in
+the sidebar. Click **Update**, and Poof downloads the new version, checks its
+signature against a key built into the app, swaps itself in place and
+restarts. You won't see any Gatekeeper prompts, and your permissions stay as
+they are. You can also check manually, or turn checks off, in Settings →
+Updates.
 
 ## Build from source
 

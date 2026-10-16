@@ -7,6 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+minisign.workspace = true
 resvg = "0.45"
 
 [lints]

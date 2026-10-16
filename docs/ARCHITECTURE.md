@@ -16,7 +16,8 @@ Poof is a Cargo workspace with a strict dependency direction:
 │  cleanup   declarative rule CATALOG → find()      remove    guard + Trash/delete + log  │
 │  history   scan Summary, persistence, changes()   monitor   samples, alerts, LaunchAgent│
 │  suspects  known "System Data" hogs               volume    capacity via Foundation     │
-│  system    tmutil, Full Disk Access, Finder, notifications    settings · paths · time   │
+│  system    tmutil, Full Disk Access, Finder, notifications    update    signed self-update│
+│  settings · paths · time · store                                                        │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -65,6 +66,12 @@ so the reported changes add up to the true total.
 and by the app while it is open; at most one sample per 10 minutes) appends a free-space sample.
 `monitor::evaluate` is a pure function that decides whether to alert (a sharp
 drop in 24 h, or space below a floor), with a cooldown between alerts.
+
+**Updates.** `update::check` asks GitHub for the latest release once a day.
+`update::install` downloads the zip and its minisign signature, verifies them
+against the embedded public key, checks the unpacked bundle, and swaps it in
+place with rollback. The app relaunches through `update::relaunch`. See
+[ADR 6](adr/0006-self-updates.md).
 
 **Cleanup.** `cleanup::find` evaluates every rule in parallel, measures each
 candidate with the same walker that powers scans, and returns `Finding`s. The

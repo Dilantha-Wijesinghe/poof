@@ -21,6 +21,8 @@ Examples of in-scope issues:
 - Leftover detection flagging data of an installed app
 - Command or AppleScript injection through file names
 - The LaunchAgent being abusable by other users or processes
+- A way to make the updater install anything that wasn't signed with Poof's
+  update key
 
 ## Safety model
 
@@ -30,4 +32,8 @@ See [docs/adr/0004-safety-model.md](docs/adr/0004-safety-model.md). In short:
 - Explore only moves items to the Trash
 - only regenerable data is preselected
 - every action is logged to `~/Library/Logs/Poof/operations.log`
-- Poof makes no network requests and collects no data
+- Poof collects no data; its only network request is the daily update check
+  to GitHub
+- updates are installed only if their minisign signature matches the public
+  key built into the app, and the bundle identifier, version and code
+  signature check out (see docs/adr/0006-self-updates.md)

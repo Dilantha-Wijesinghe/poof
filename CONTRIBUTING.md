@@ -67,11 +67,28 @@ docs: explain purgeable space
 
 Poof follows [Semantic Versioning](https://semver.org).
 
+**One-time setup.** Releases need two signing secrets. Run these once, and
+back up `~/.poof-release` somewhere safe, such as a password manager:
+
+```sh
+cargo xtask keygen                     # update-signing key; commits nothing secret
+scripts/create-signing-identity.sh     # code-signing certificate (keeps Full Disk Access across updates)
+gh secret set POOF_UPDATE_SIGNING_KEY < ~/.poof-release/update-signing.key
+base64 -i ~/.poof-release/codesign.p12 | gh secret set POOF_CODESIGN_P12
+gh secret set POOF_CODESIGN_P12_PASSWORD < ~/.poof-release/codesign-password.txt
+```
+
+Never regenerate these keys for an existing project. Installed copies only
+accept updates signed with the key they shipped with.
+
+**Each release:**
+
 1. Bump `version` in the root `Cargo.toml` (`[workspace.package]`) and run
    `cargo check` to refresh `Cargo.lock`.
 2. Update `CHANGELOG.md` (`git cliff --unreleased --tag vX.Y.Z --prepend CHANGELOG.md`
    helps), then commit with `chore(release): vX.Y.Z`.
 3. Tag and push: `git tag -a vX.Y.Z -m "Poof vX.Y.Z" && git push --follow-tags`.
-4. The **Release** workflow builds the universal app, creates the GitHub
-   release with that version's changelog section, and attaches the `.dmg`,
-   `.zip` and `SHA256SUMS.txt`.
+4. The **Release** workflow builds and signs the universal app, signs the
+   update archive, creates the GitHub release with that version's changelog
+   section, and attaches the `.dmg`, `.zip`, `.zip.minisig` and
+   `SHA256SUMS.txt`. Installed copies of Poof pick the update up within a day.

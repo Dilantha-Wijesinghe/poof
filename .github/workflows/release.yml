@@ -29,8 +29,40 @@ jobs:
       - name: Test
         run: cargo test --workspace --locked
 
+      - name: Install rcodesign
+        run: cargo install apple-codesign --version 0.29.0 --locked
+
+      # Signing with Poof's own certificate keeps the app's identity stable, so
+      # macOS remembers Full Disk Access across updates. Never ship without it.
+      - name: Load the code-signing certificate
+        env:
+          P12: ${{ secrets.POOF_CODESIGN_P12 }}
+          P12_PASSWORD: ${{ secrets.POOF_CODESIGN_P12_PASSWORD }}
+        run: |
+          if [ -z "$P12" ] || [ -z "$P12_PASSWORD" ]; then
+            echo "::error::Missing POOF_CODESIGN_P12 / POOF_CODESIGN_P12_PASSWORD secrets"; exit 1
+          fi
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/codesign.p12"
+          printf '%s' "$P12_PASSWORD" > "$RUNNER_TEMP/codesign-password.txt"
+          echo "POOF_CODESIGN_P12=$RUNNER_TEMP/codesign.p12" >> "$GITHUB_ENV"
+          echo "POOF_CODESIGN_PASSWORD_FILE=$RUNNER_TEMP/codesign-password.txt" >> "$GITHUB_ENV"
+
       - name: Build universal app
         run: scripts/bundle.sh
+
+      # The in-app updater only installs archives signed with this key.
+      - name: Sign the update archive
+        env:
+          POOF_UPDATE_SIGNING_KEY: ${{ secrets.POOF_UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$POOF_UPDATE_SIGNING_KEY" ]; then
+            echo "::error::Missing POOF_UPDATE_SIGNING_KEY secret"; exit 1
+          fi
+          cargo xtask sign "dist/Poof-${GITHUB_REF_NAME#v}.zip"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/codesign.p12" "$RUNNER_TEMP/codesign-password.txt"
 
       - name: Extract release notes from CHANGELOG.md
         run: |
@@ -42,8 +74,9 @@ jobs:
           cat >> notes.md <<'NOTES'
 
           ### Install
-          Download `Poof-*.dmg`, drag Poof to Applications, then run
-          `xattr -dr com.apple.quarantine /Applications/Poof.app` (the app is not yet notarized).
+          Already using Poof? It will offer this update by itself.
+          New here? Download `Poof-*.dmg`, drag Poof to Applications, then run
+          `xattr -dr com.apple.quarantine /Applications/Poof.app` (the app is not notarized yet).
           Verify downloads with `SHA256SUMS.txt`.
           NOTES
 
@@ -54,4 +87,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "Poof ${GITHUB_REF_NAME#v}" \
             --notes-file notes.md \
-            dist/*.dmg dist/*.zip dist/SHA256SUMS.txt
+            dist/*.dmg dist/*.zip dist/*.zip.minisig dist/SHA256SUMS.txt

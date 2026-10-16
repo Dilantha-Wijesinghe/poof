@@ -11,6 +11,7 @@ use poof_core::{APP_NAME, paths, system as mac};
 use super::{Action, Event, Shared};
 use crate::icon::Icon;
 use crate::style::{self, Kind, Tone, size, space as gap};
+use crate::updater;
 use crate::widget::{badge, btn, caption, card, divider, label, page_header, page_scroll, section};
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -44,6 +45,9 @@ pub enum Message {
     OpenLog,
     OpenRepository,
     MonitorFailed(String),
+    AutoUpdate(bool),
+    CheckForUpdates,
+    ReviewUpdate,
 }
 
 pub fn update(message: Message, current: &Settings) -> Action<Message> {
@@ -55,6 +59,9 @@ pub fn update(message: Message, current: &Settings) -> Action<Message> {
         Message::AlertDrop(c) => next.alert_drop_gb = c.0,
         Message::LowSpace(c) => next.low_space_gb = c.0,
         Message::StaleDays(c) => next.stale_project_days = u32::try_from(c.0).unwrap_or(30),
+        Message::AutoUpdate(on) => next.check_for_updates = on,
+        Message::CheckForUpdates => return Action::event(Event::CheckForUpdates),
+        Message::ReviewUpdate => return Action::event(Event::ReviewUpdate),
         Message::GrantAccess => {
             let _ = mac::open_full_disk_access_settings();
             return Action::none();
@@ -77,7 +84,7 @@ pub fn update(message: Message, current: &Settings) -> Action<Message> {
     Action::event(Event::SettingsChanged(next))
 }
 
-pub fn view(shared: &Shared) -> Element<'_, Message> {
+pub fn view<'a>(shared: &'a Shared, updater: &'a updater::State) -> Element<'a, Message> {
     let s = &shared.settings;
     let choice = |list: &[Choice], value: u64| list.iter().copied().find(|c| c.0 == value);
 
@@ -159,10 +166,7 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
 
     let about = card(setting(
         "About",
-        format!(
-            "{APP_NAME} {}. Open source under the MIT license. Poof doesn't collect any data.",
-            env!("CARGO_PKG_VERSION")
-        ),
+        format!("{APP_NAME} is open source under the MIT license and doesn't collect any data."),
         btn("GitHub", Some(Icon::ExternalLink), Kind::Secondary).on_press(Message::OpenRepository),
     ));
 
@@ -172,12 +176,36 @@ pub fn view(shared: &Shared) -> Element<'_, Message> {
             column![section("General"), appearance].spacing(gap::S),
             column![section("Cleaning"), cleaning].spacing(gap::S),
             column![section("Monitoring"), monitoring].spacing(gap::S),
+            column![section("Updates"), updates_card(s, updater)].spacing(gap::S),
             column![section("Privacy & Safety"), privacy].spacing(gap::S),
             column![section("About"), about].spacing(gap::S),
         ]
         .spacing(gap::XL)
         .max_width(860),
     )
+}
+
+/// Automatic update checks plus the current version and its status.
+fn updates_card<'a>(s: &Settings, updater: &'a updater::State) -> Element<'a, Message> {
+    let update_action = if updater.has_update() {
+        btn("Update…", Some(Icon::Download), Kind::Primary).on_press(Message::ReviewUpdate)
+    } else {
+        btn("Check Now", Some(Icon::Refresh), Kind::Secondary)
+            .on_press_maybe((!updater.is_busy()).then_some(Message::CheckForUpdates))
+    };
+    card(
+        column![
+            setting(
+                "Check for updates automatically",
+                "Once a day, Poof asks GitHub whether a newer version is out. Nothing about you or your Mac is sent.",
+                toggler(s.check_for_updates).on_toggle(Message::AutoUpdate).style(style::toggler),
+            ),
+            divider(),
+            setting("Version", updater.summary(), update_action),
+        ]
+        .spacing(gap::L),
+    )
+    .into()
 }
 
 /// A labelled setting with its control on the right.

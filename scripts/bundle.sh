@@ -30,10 +30,21 @@ sed "s/__VERSION__/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.
 cp packaging/macos/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
-echo "==> Signing (ad-hoc)"
-# Without a paid Developer ID the app is ad-hoc signed; see README → Install.
-codesign --force --deep --options runtime --sign "${CODESIGN_IDENTITY:--}" "$APP"
-codesign --verify --strict "$APP"
+# Releases are signed with Poof's own certificate (scripts/create-signing-identity.sh)
+# so macOS keeps permissions such as Full Disk Access across updates. rcodesign
+# signs straight from the .p12: no keychain or trust settings are involved.
+# Local builds fall back to an ad-hoc signature.
+if [[ -n "${POOF_CODESIGN_P12:-}" ]]; then
+  echo "==> Signing with $(basename "$POOF_CODESIGN_P12")"
+  rcodesign sign --p12-file "$POOF_CODESIGN_P12" \
+    --p12-password-file "${POOF_CODESIGN_PASSWORD_FILE:?set POOF_CODESIGN_PASSWORD_FILE}" \
+    --code-signature-flags runtime "$APP" >/dev/null
+else
+  echo "==> Signing (ad-hoc)"
+  codesign --force --deep --options runtime --sign - "$APP"
+fi
+codesign --verify --deep --strict "$APP"
+codesign --display --requirements - "$APP" 2>&1 | sed -n 's/^designated => /    identity: /p'
 
 echo "==> Packaging"
 staging="$(mktemp -d)"

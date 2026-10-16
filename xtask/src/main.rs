@@ -1,7 +1,9 @@
 //! Development tasks for Poof.
 //!
 //! ```sh
-//! cargo xtask icon   # packaging/macos/icon.svg → packaging/macos/AppIcon.icns
+//! cargo xtask icon          # packaging/macos/icon.svg → packaging/macos/AppIcon.icns
+//! cargo xtask keygen        # create the update-signing key pair (once per project)
+//! cargo xtask sign <file>   # write <file>.minisig using $POOF_UPDATE_SIGNING_KEY
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -27,7 +29,11 @@ fn main() -> ExitCode {
     let task = std::env::args().nth(1);
     let result = match task.as_deref() {
         Some("icon") => icon(),
-        _ => Err("usage: cargo xtask icon".to_owned()),
+        Some("keygen") => keygen(),
+        Some("sign") => {
+            std::env::args().nth(2).ok_or_else(|| "usage: cargo xtask sign <file>".to_owned()).and_then(sign)
+        }
+        _ => Err("usage: cargo xtask <icon | keygen | sign FILE>".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -74,5 +80,69 @@ fn icon() -> Result<(), String> {
         return Err(format!("iconutil exited with {status}"));
     }
     println!("wrote {}", output.display());
+    Ok(())
+}
+
+/// Where `keygen` keeps the secret key: outside the repository, private to the user.
+fn secret_key_path() -> PathBuf {
+    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+    home.join(".poof-release/update-signing.key")
+}
+
+/// Creates the minisign key pair that signs update archives. The public key
+/// is committed (the app embeds it); the secret key goes to
+/// `~/.poof-release/` and must be added to the `POOF_UPDATE_SIGNING_KEY`
+/// GitHub secret.
+fn keygen() -> Result<(), String> {
+    let secret_path = secret_key_path();
+    if secret_path.exists() {
+        return Err(format!("{} already exists; refusing to overwrite it", secret_path.display()));
+    }
+    let pair = minisign::KeyPair::generate_unencrypted_keypair().map_err(|e| e.to_string())?;
+    let public = pair.pk.to_box().map_err(|e| e.to_string())?.into_string();
+    let secret = pair.sk.to_box(Some("Poof update signing key")).map_err(|e| e.to_string())?.into_string();
+
+    let dir = secret_path.parent().ok_or("invalid key path")?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    write_private(&secret_path, &secret)?;
+    std::fs::write(root().join("crates/poof-core/update-key.pub"), public).map_err(|e| e.to_string())?;
+    println!("public key  → crates/poof-core/update-key.pub (commit this)");
+    println!(
+        "secret key  → {} (back it up; add it as the POOF_UPDATE_SIGNING_KEY secret)",
+        secret_path.display()
+    );
+    Ok(())
+}
+
+fn write_private(path: &Path, contents: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+        .and_then(|mut f| f.write_all(contents.as_bytes()))
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Signs a release archive. The key comes from `$POOF_UPDATE_SIGNING_KEY`
+/// (as in CI) or, locally, from `~/.poof-release/update-signing.key`.
+fn sign(file: String) -> Result<(), String> {
+    let secret = match std::env::var("POOF_UPDATE_SIGNING_KEY") {
+        Ok(key) if !key.trim().is_empty() => key,
+        _ => std::fs::read_to_string(secret_key_path()).map_err(|_| {
+            "no signing key: set POOF_UPDATE_SIGNING_KEY or run `cargo xtask keygen`".to_owned()
+        })?,
+    };
+    let key_box = minisign::SecretKeyBox::from_string(&secret).map_err(|e| e.to_string())?;
+    let key = minisign::SecretKey::from_box(key_box, None).map_err(|e| e.to_string())?;
+    let data = std::fs::File::open(&file).map_err(|e| format!("{file}: {e}"))?;
+    let name = Path::new(&file).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let trusted = format!("file:{name}");
+    let signature = minisign::sign(None, &key, data, Some(&trusted), None).map_err(|e| e.to_string())?;
+    let out = format!("{file}.minisig");
+    std::fs::write(&out, signature.into_string()).map_err(|e| e.to_string())?;
+    println!("wrote {out}");
     Ok(())
 }

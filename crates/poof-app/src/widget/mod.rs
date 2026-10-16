@@ -241,8 +241,11 @@ impl<M> Dialog<M> {
 }
 
 /// Overlays `dialog` (if any) on top of `base`, dimming the background.
+///
+/// The overlay layer is always present, even when empty, so opening a
+/// dialog doesn't rebuild `base` and lose its scroll position.
 pub fn modal<'a, M: Clone + 'a>(base: Element<'a, M>, dialog: Option<Dialog<M>>) -> Element<'a, M> {
-    let Some(dialog) = dialog else { return base };
+    let Some(dialog) = dialog else { return stack![base, space()].into() };
     let details = dialog
         .details
         .into_iter()

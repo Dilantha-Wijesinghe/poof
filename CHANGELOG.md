@@ -42,6 +42,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - a protected-path guard
   - Trash-only removal in Explore
   - an operations log at `~/Library/Logs/Poof/operations.log`
+- **Updates**: Poof checks GitHub once a day and installs new versions in one
+  click. Updates are verified with a minisign signature and swapped in place
+  with rollback. Releases are signed with a stable certificate so Full Disk
+  Access survives updates.
 - Light and dark themes that follow the system, with a Light/Dark switch in
   the sidebar.
 - A universal (Apple silicon + Intel) `.app`, `.dmg` and `.zip` via

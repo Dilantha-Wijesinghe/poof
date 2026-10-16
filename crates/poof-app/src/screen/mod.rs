@@ -80,6 +80,10 @@ pub enum Event {
     Toast(String, Tone),
     /// The user changed a setting.
     SettingsChanged(Settings),
+    /// Look for a new version now and report the result.
+    CheckForUpdates,
+    /// Show the "install update" dialog.
+    ReviewUpdate,
 }
 
 /// The result of a screen's `update`: work to run and/or an event to emit.

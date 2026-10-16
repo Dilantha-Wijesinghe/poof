@@ -14,7 +14,7 @@ use crate::icon::Icon;
 use crate::screen::{Action, Event, Screen, Shared, changes, cleanup, explore, overview, settings};
 use crate::style::{self, Tone, size, space as gap};
 use crate::widget::{self, caption};
-use crate::{font, task};
+use crate::{font, task, updater};
 
 #[derive(Debug)]
 pub struct App {
@@ -25,6 +25,7 @@ pub struct App {
     explore: explore::State,
     cleanup: cleanup::State,
     changes: changes::State,
+    updater: updater::State,
     toast: Option<Toast>,
 }
 
@@ -51,6 +52,7 @@ pub enum Message {
     Cleanup(cleanup::Message),
     Changes(changes::Message),
     Settings(settings::Message),
+    Updater(updater::Message),
 }
 
 impl App {
@@ -60,6 +62,7 @@ impl App {
         let (cleanup, cleanup_task) = cleanup::State::new(&settings);
         let (changes, changes_task) = changes::State::new();
         let monitor_task = sync_monitor(&settings);
+        let update_task = updater::startup_check(settings.check_for_updates);
 
         let app = Self {
             screen: Screen::Overview,
@@ -69,6 +72,7 @@ impl App {
             explore: explore::State::default(),
             cleanup,
             changes,
+            updater: updater::State::default(),
             toast: None,
         };
         let boot = Task::batch([
@@ -78,6 +82,7 @@ impl App {
             cleanup_task.map(Message::Cleanup),
             changes_task.map(Message::Changes),
             monitor_task,
+            update_task.map(Message::Updater),
         ]);
         (app, boot)
     }
@@ -101,6 +106,12 @@ impl App {
             // Keep the free-space figures live while the app is open.
             time::every(Duration::from_secs(60)).map(|_| Message::RefreshDisk),
             self.explore.subscription().map(Message::Explore),
+            if self.shared.settings.check_for_updates {
+                time::every(Duration::from_secs(24 * 60 * 60))
+                    .map(|_| Message::Updater(updater::Message::Check { manual: false }))
+            } else {
+                Subscription::none()
+            },
             if self.toast.is_some() {
                 time::every(Duration::from_millis(500)).map(|_| Message::Tick)
             } else {
@@ -154,6 +165,10 @@ impl App {
                 let action = self.changes.update(m);
                 self.handle(action, Message::Changes)
             }
+            Message::Updater(m) => {
+                let action = self.updater.update(m);
+                self.handle(action, Message::Updater)
+            }
             Message::Settings(m) => {
                 let action = settings::update(m, &self.shared.settings);
                 self.handle(action, Message::Settings)
@@ -195,6 +210,8 @@ impl App {
                 ])
             }
             Event::Scanned => self.changes.reload().map(Message::Changes),
+            Event::CheckForUpdates => self.update(Message::Updater(updater::Message::Check { manual: true })),
+            Event::ReviewUpdate => self.update(Message::Updater(updater::Message::Review)),
             Event::Toast(message, tone) => {
                 self.show_toast(message, tone);
                 Task::none()
@@ -202,6 +219,7 @@ impl App {
             Event::SettingsChanged(settings) => {
                 let monitor_changed = settings.monitor_enabled != self.shared.settings.monitor_enabled;
                 let stale_changed = settings.stale_project_days != self.shared.settings.stale_project_days;
+                let updates_enabled = settings.check_for_updates && !self.shared.settings.check_for_updates;
                 if let Err(e) = settings.save() {
                     self.show_toast(format!("Could not save settings: {e}"), Tone::Danger);
                 }
@@ -212,6 +230,9 @@ impl App {
                 }
                 if stale_changed {
                     tasks.push(self.cleanup.refresh(&self.shared.settings).map(Message::Cleanup));
+                }
+                if updates_enabled {
+                    tasks.push(updater::startup_check(true).map(Message::Updater));
                 }
                 Task::batch(tasks)
             }
@@ -242,22 +263,23 @@ impl App {
             Screen::Explore => self.explore.view(&self.shared).map(Message::Explore),
             Screen::Cleanup => self.cleanup.view(&self.shared).map(Message::Cleanup),
             Screen::Changes => self.changes.view(&self.shared).map(Message::Changes),
-            Screen::Settings => settings::view(&self.shared).map(Message::Settings),
+            Screen::Settings => settings::view(&self.shared, &self.updater).map(Message::Settings),
         };
         // Leave room for the transparent title bar and its traffic lights.
         let main =
             container(column![space().height(30), content]).width(Fill).height(Fill).style(style::page);
         let layout: Element<'_, Message> = row![self.sidebar(), main].into();
 
-        let layout = match &self.toast {
-            Some(toast) => stack![layout, toast_view(toast)].into(),
-            None => layout,
-        };
+        // The toast layer always exists (empty when idle) so showing a toast
+        // doesn't rebuild the layout and reset scroll positions.
+        let toast: Element<'_, Message> = self.toast.as_ref().map_or_else(|| space().into(), toast_view);
+        let layout: Element<'_, Message> = stack![layout, toast].into();
         let dialog = match self.screen {
             Screen::Explore => self.explore.dialog().map(|d| d.map(Message::Explore)),
             Screen::Cleanup => self.cleanup.dialog().map(|d| d.map(Message::Cleanup)),
             _ => None,
-        };
+        }
+        .or_else(|| self.updater.dialog().map(|d| d.map(Message::Updater)));
         widget::modal(layout, dialog)
     }
 
@@ -320,18 +342,13 @@ impl App {
         });
 
         container(
-            column![
-                space().height(40),
-                brand,
-                space().height(gap::XL),
-                nav,
-                space::vertical(),
-                self.theme_switch()
-            ]
-            .push(disk)
-            .spacing(gap::S)
-            .padding([gap::L, gap::M])
-            .width(Fill),
+            column![space().height(40), brand, space().height(gap::XL), nav, space::vertical(),]
+                .push(self.updater.notice().map(|notice| notice.map(Message::Updater)))
+                .push(self.theme_switch())
+                .push(disk)
+                .spacing(gap::S)
+                .padding([gap::L, gap::M])
+                .width(Fill),
         )
         .width(224)
         .height(Fill)
