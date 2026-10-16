@@ -12,6 +12,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from Explore or Clean Up.
 - Settings → About has a Report a problem button. It opens a GitHub bug report
   with the Poof and macOS versions filled in.
+- If a new version doesn't start within a minute of updating, Poof puts the
+  previous version back, reopens it and says so.
 
 ### Changed
 

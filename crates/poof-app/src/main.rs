@@ -2,6 +2,8 @@
 //!
 //! Running the binary opens the app. `poof --check` performs one background
 //! free-space check (used by the optional `LaunchAgent`) and exits.
+//! `poof --finish-update <pid> <bundle>` sees an update through its first
+//! launch (see `poof_core::update::finish_update`).
 
 mod app;
 mod font;
@@ -13,15 +15,20 @@ mod trash;
 mod updater;
 mod widget;
 
-use poof_core::monitor;
+use std::path::Path;
+
+use poof_core::{monitor, update};
 
 fn main() -> iced::Result {
-    if std::env::args().any(|a| a == monitor::CHECK_FLAG) {
-        if let Err(e) = monitor::check() {
-            eprintln!("poof: {e}");
-            std::process::exit(1);
-        }
-        return Ok(());
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == monitor::CHECK_FLAG) {
+        exit_with(monitor::check().map(drop));
+    }
+    if let [_, flag, pid, bundle] = args.as_slice()
+        && flag == update::FINISH_FLAG
+        && let Ok(pid) = pid.parse()
+    {
+        exit_with(update::finish_update(pid, Path::new(bundle)));
     }
 
     let mut application = iced::application(app::App::new, app::App::update, app::App::view)
@@ -35,4 +42,12 @@ fn main() -> iced::Result {
         application = application.font(file);
     }
     application.run()
+}
+
+/// Ends a command-line run, reporting `result`'s error if there is one.
+fn exit_with(result: poof_core::Result<()>) -> ! {
+    if let Err(e) = &result {
+        eprintln!("poof: {e}");
+    }
+    std::process::exit(i32::from(result.is_err()))
 }

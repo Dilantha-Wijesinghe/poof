@@ -87,9 +87,15 @@ impl App {
             trash: trash::State::default(),
             toast: None,
         };
+        let current = poof_core::update::Version::current();
         if let Some(from) = poof_core::update::take_update_note() {
-            let current = poof_core::update::Version::current();
             app.show_toast(format!("Updated to Poof {current} (from {from})."), Tone::Success);
+        }
+        if let Some(failed) = poof_core::update::take_failed_update() {
+            app.show_toast(
+                format!("Poof {failed} didn't start, so Poof {current} was put back."),
+                Tone::Warning,
+            );
         }
         let boot = Task::batch([
             system::theme().map(Message::SystemTheme),

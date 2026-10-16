@@ -5,7 +5,9 @@
 //!    the signature against [`PUBLIC_KEY`] (compiled into the app), unpacks it,
 //!    checks the bundle identifier, version and code signature, then swaps the
 //!    running app bundle for the new one.
-//! 3. [`relaunch`] starts the new version once this process has exited.
+//! 3. [`relaunch`] starts the new version once this process has exited. The
+//!    previous version is kept until the new one has started, and is put back
+//!    if it doesn't ([`finish_update`]).
 //!
 //! Downloads go through `curl`, which ships with macOS, so there is no HTTP
 //! stack to maintain. Files fetched this way are not quarantined, so
@@ -15,6 +17,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
@@ -203,22 +206,40 @@ fn find_app(dir: &Path) -> Result<PathBuf> {
 
 /// Makes sure the unpacked app really is the expected version of Poof.
 fn check_bundle(app: &Path, expected: Version) -> Result<()> {
-    let plist = app.join("Contents/Info.plist");
-    let read = |key: &str| system::run("plutil", &["-extract", key, "raw", &plist.to_string_lossy()]);
-    let identifier = read("CFBundleIdentifier")?;
-    let version = read("CFBundleShortVersionString")?;
-    if identifier.trim() != APP_ID || Version::parse(&version) != Some(expected) {
+    let identifier = bundle_info(app, "CFBundleIdentifier")?;
+    if identifier.trim() != APP_ID || bundle_version(app) != Some(expected) {
         return Err(Error::Other(format!("the update is not Poof {expected}")));
     }
     system::run("codesign", &["--verify", "--deep", "--strict", &app.to_string_lossy()]).map(drop)
 }
 
+/// A value from an app's `Info.plist`.
+fn bundle_info(app: &Path, key: &str) -> Result<String> {
+    let plist = app.join("Contents/Info.plist");
+    system::run("plutil", &["-extract", key, "raw", &plist.to_string_lossy()])
+}
+
+fn bundle_version(app: &Path) -> Option<Version> {
+    Version::parse(&bundle_info(app, "CFBundleShortVersionString").ok()?)
+}
+
+/// A hidden folder beside `bundle`: `/Applications/.Poof.app.<suffix>`.
+fn beside(bundle: &Path, suffix: &str) -> PathBuf {
+    let name = bundle.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    bundle.with_file_name(format!(".{name}.{suffix}"))
+}
+
+/// Where the replaced version is kept until the new one has started.
+fn backup_of(bundle: &Path) -> PathBuf {
+    beside(bundle, "previous")
+}
+
 /// Swaps `current` for `new`, restoring `current` if anything goes wrong.
+/// The old bundle is kept as [`backup_of`] `current`.
 fn replace(current: &Path, new: &Path) -> Result<()> {
     let parent = current.parent().ok_or_else(|| Error::Other("the app has no parent folder".into()))?;
-    let name = current.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let staged = parent.join(format!(".{name}.update"));
-    let backup = parent.join(format!(".{name}.previous"));
+    let staged = beside(current, "update");
+    let backup = backup_of(current);
     let _ = fs::remove_dir_all(&staged);
     let _ = fs::remove_dir_all(&backup);
 
@@ -240,7 +261,6 @@ fn replace(current: &Path, new: &Path) -> Result<()> {
         let _ = fs::remove_dir_all(&staged);
         return Err(Error::io("install", current)(e));
     }
-    let _ = fs::remove_dir_all(&backup);
     Ok(())
 }
 
@@ -251,13 +271,24 @@ pub fn remember_update(from: Version) {
 }
 
 /// If this launch is the first after an update, returns the version updated
-/// from. Consumes the note, so it is reported once.
+/// from. Consumes the note, so it is reported once. Consuming it also tells
+/// [`finish_update`] that the new version started.
 pub fn take_update_note() -> Option<Version> {
-    take_from(&note_path(), Version::current())
+    take_from(&note_path()).filter(|&from| from < Version::current())
+}
+
+/// If an update was rolled back because it didn't start, returns the version
+/// that failed. Reported once.
+pub fn take_failed_update() -> Option<Version> {
+    take_from(&failed_note_path())
 }
 
 fn note_path() -> PathBuf {
     crate::paths::data_dir().join("updated-from")
+}
+
+fn failed_note_path() -> PathBuf {
+    crate::paths::data_dir().join("update-failed")
 }
 
 fn remember_in(path: &Path, from: Version) {
@@ -267,21 +298,86 @@ fn remember_in(path: &Path, from: Version) {
     let _ = fs::write(path, from.to_string());
 }
 
-fn take_from(path: &Path, current: Version) -> Option<Version> {
+fn take_from(path: &Path) -> Option<Version> {
     let text = fs::read_to_string(path).ok()?;
     let _ = fs::remove_file(path);
-    Version::parse(&text).filter(|&from| from < current)
+    Version::parse(&text)
 }
 
-/// Opens `bundle` again as soon as the process `pid` has exited.
+// ------------------------------------------------------------- first launch
+
+/// Run with this flag (plus a process id and a bundle path), Poof finishes an
+/// update instead of opening its window. See [`finish_update`].
+pub const FINISH_FLAG: &str = "--finish-update";
+
+/// How long a new version gets to start before the update is rolled back.
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Hands over to the previous version's binary, kept beside the new `bundle`,
+/// which runs [`finish_update`] once this process (`pid`) has exited.
 pub fn relaunch(bundle: &Path, pid: u32) -> Result<()> {
-    Command::new("/bin/sh")
-        .args(["-c", r#"while kill -0 "$0" 2>/dev/null; do sleep 0.2; done; open "$1""#])
+    let exe = std::env::current_exe().map_err(Error::io("locate", "the running app"))?;
+    let name = exe.file_name().ok_or_else(|| Error::Other("the running app has no name".into()))?;
+    let watcher = backup_of(bundle).join("Contents/MacOS").join(name);
+    Command::new(&watcher)
+        .arg(FINISH_FLAG)
         .arg(pid.to_string())
         .arg(bundle)
         .spawn()
         .map(drop)
-        .map_err(|e| Error::Command { program: "sh".into(), message: e.to_string() })
+        .map_err(|e| Error::Command { program: watcher.display().to_string(), message: e.to_string() })
+}
+
+/// Waits for process `pid` to exit, then opens the newly installed `bundle`.
+/// If it hasn't started within a minute, puts the previous version back and
+/// opens that instead, which then reports the failed update. Blocking.
+pub fn finish_update(pid: u32, bundle: &Path) -> Result<()> {
+    while system::run("kill", &["-0", &pid.to_string()]).is_ok() {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    let open = |app: &Path| system::run("open", &[&app.to_string_lossy()]).map(drop);
+    watch_first_launch(bundle, &note_path(), &failed_note_path(), STARTUP_TIMEOUT, open)
+}
+
+/// Opens `bundle` and waits for it to consume `note` (see
+/// [`take_update_note`]). On success the backup is removed; otherwise the
+/// backup replaces `bundle` and the failed version is written to `failed_note`.
+fn watch_first_launch(
+    bundle: &Path,
+    note: &Path,
+    failed_note: &Path,
+    timeout: Duration,
+    open: impl Fn(&Path) -> Result<()>,
+) -> Result<()> {
+    let backup = backup_of(bundle);
+    if open(bundle).is_ok() && wait_until(timeout, || !note.exists()) {
+        return fs::remove_dir_all(&backup).map_err(Error::io("remove", &backup));
+    }
+    let failed = bundle_version(bundle);
+    // Stop the new version in case it hangs rather than crashed.
+    let _ = system::run("pkill", &["-f", &bundle.join("Contents/MacOS/").to_string_lossy()]);
+    let broken = beside(bundle, "failed");
+    let _ = fs::remove_dir_all(&broken);
+    fs::rename(bundle, &broken).map_err(Error::io("move", bundle))?;
+    fs::rename(&backup, bundle).map_err(Error::io("restore", bundle))?;
+    let _ = fs::remove_dir_all(&broken);
+    let _ = fs::remove_file(note);
+    if let Some(version) = failed {
+        remember_in(failed_note, version);
+    }
+    open(bundle)
+}
+
+/// Polls `done` until it holds or `timeout` passes. Returns whether it held.
+fn wait_until(timeout: Duration, done: impl Fn() -> bool) -> bool {
+    let start = Instant::now();
+    while !done() {
+        if start.elapsed() > timeout {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    true
 }
 
 #[cfg(test)]
@@ -408,9 +504,7 @@ mod tests {
     }
 
     fn installed_version(app: &Path) -> String {
-        let plist = app.join("Contents/Info.plist");
-        system::run("plutil", &["-extract", "CFBundleShortVersionString", "raw", &plist.to_string_lossy()])
-            .unwrap()
+        bundle_version(app).unwrap().to_string()
     }
 
     #[test]
@@ -424,10 +518,57 @@ mod tests {
         let release = release_for(&build, Version(0, 2, 0), &secret);
 
         install_with_key(&release, &installed, &public).unwrap();
-        assert_eq!(installed_version(&installed).trim(), "0.2.0");
-        let leftovers: Vec<_> =
+        assert_eq!(installed_version(&installed), "0.2.0");
+        assert_eq!(installed_version(&backup_of(&installed)), "0.1.0", "kept until the new version starts");
+        let mut leftovers: Vec<_> =
             fs::read_dir(&applications).unwrap().flatten().map(|e| e.file_name()).collect();
-        assert_eq!(leftovers, ["Poof.app"], "no staging or backup copies remain");
+        leftovers.sort();
+        assert_eq!(leftovers, [".Poof.app.previous", "Poof.app"], "no staging copy remains");
+    }
+
+    /// `Poof.app` at `new` installed over a backed-up `old`, as after [`replace`].
+    fn updated_app(root: &Path, old: &str, new: &str) -> PathBuf {
+        let app = fake_app(&root.join("new"), new);
+        let installed = root.join("Applications/Poof.app");
+        fs::create_dir_all(installed.parent().unwrap()).unwrap();
+        fs::rename(fake_app(&root.join("old"), old), backup_of(&installed)).unwrap();
+        fs::rename(app, &installed).unwrap();
+        installed
+    }
+
+    #[test]
+    fn a_new_version_that_starts_keeps_the_update() {
+        let root = tempfile::tempdir().unwrap();
+        let installed = updated_app(root.path(), "0.1.0", "0.2.0");
+        let (note, failed) = (root.path().join("updated-from"), root.path().join("update-failed"));
+        remember_in(&note, Version(0, 1, 0));
+
+        // The new version consumes the note when it starts.
+        let start = |_: &Path| fs::remove_file(&note).map_err(Error::io("start", &note));
+        watch_first_launch(&installed, &note, &failed, Duration::from_secs(5), start).unwrap();
+        assert_eq!(installed_version(&installed), "0.2.0");
+        assert!(!backup_of(&installed).exists());
+        assert!(!failed.exists());
+    }
+
+    #[test]
+    fn a_new_version_that_never_starts_is_rolled_back() {
+        let root = tempfile::tempdir().unwrap();
+        let installed = updated_app(root.path(), "0.1.0", "0.2.0");
+        let (note, failed) = (root.path().join("updated-from"), root.path().join("update-failed"));
+        remember_in(&note, Version(0, 1, 0));
+
+        let opened = std::cell::Cell::new(0);
+        let crash = |_: &Path| {
+            opened.set(opened.get() + 1);
+            Ok(())
+        };
+        watch_first_launch(&installed, &note, &failed, Duration::from_millis(300), crash).unwrap();
+        assert_eq!(installed_version(&installed), "0.1.0");
+        assert_eq!(opened.get(), 2, "the previous version is opened again");
+        assert!(!backup_of(&installed).exists() && !beside(&installed, "failed").exists());
+        assert!(!note.exists());
+        assert_eq!(take_from(&failed), Some(Version(0, 2, 0)));
     }
 
     #[test]
@@ -461,15 +602,12 @@ mod tests {
     }
 
     #[test]
-    fn the_update_note_is_reported_once_and_only_for_upgrades() {
+    fn update_notes_are_reported_once() {
         let dir = tempfile::tempdir().unwrap();
         let note = dir.path().join("nested/updated-from");
         remember_in(&note, Version(0, 1, 0));
-        assert_eq!(take_from(&note, Version(0, 1, 1)), Some(Version(0, 1, 0)));
-        assert_eq!(take_from(&note, Version(0, 1, 1)), None, "consumed");
-
-        remember_in(&note, Version(0, 2, 0));
-        assert_eq!(take_from(&note, Version(0, 1, 1)), None, "not an upgrade");
+        assert_eq!(take_from(&note), Some(Version(0, 1, 0)));
+        assert_eq!(take_from(&note), None, "consumed");
     }
 
     #[test]
