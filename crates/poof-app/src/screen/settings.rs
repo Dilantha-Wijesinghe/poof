@@ -44,6 +44,7 @@ pub enum Message {
     GrantAccess,
     OpenLog,
     OpenRepository,
+    ReportProblem,
     MonitorFailed(String),
     AutoUpdate(bool),
     CheckForUpdates,
@@ -72,6 +73,10 @@ pub fn update(message: Message, current: &Settings) -> Action<Message> {
         }
         Message::OpenRepository => {
             let _ = mac::open_url(REPOSITORY);
+            return Action::none();
+        }
+        Message::ReportProblem => {
+            let _ = mac::open_url(&issue_url(env!("CARGO_PKG_VERSION"), &mac::describe_mac()));
             return Action::none();
         }
         Message::MonitorFailed(e) => {
@@ -164,12 +169,6 @@ pub fn view<'a>(shared: &'a Shared, updater: &'a updater::State) -> Element<'a, 
         .spacing(gap::L),
     );
 
-    let about = card(setting(
-        "About",
-        format!("{APP_NAME} is open source under the MIT license and doesn't collect any data."),
-        btn("GitHub", Some(Icon::ExternalLink), Kind::Secondary).on_press(Message::OpenRepository),
-    ));
-
     page_scroll(
         column![
             page_header("Settings", "Appearance, cleaning and monitoring options.", space()),
@@ -178,7 +177,7 @@ pub fn view<'a>(shared: &'a Shared, updater: &'a updater::State) -> Element<'a, 
             column![section("Monitoring"), monitoring].spacing(gap::S),
             column![section("Updates"), updates_card(s, updater)].spacing(gap::S),
             column![section("Privacy & Safety"), privacy].spacing(gap::S),
-            column![section("About"), about].spacing(gap::S),
+            column![section("About"), about_card()].spacing(gap::S),
         ]
         .spacing(gap::XL)
         .max_width(860),
@@ -208,6 +207,27 @@ fn updates_card<'a>(s: &Settings, updater: &'a updater::State) -> Element<'a, Me
     .into()
 }
 
+/// The license, the repository, and a way to report a problem.
+fn about_card<'a>() -> Element<'a, Message> {
+    card(
+        column![
+            setting(
+                "About",
+                format!("{APP_NAME} is open source under the MIT license and doesn't collect any data."),
+                btn("GitHub", Some(Icon::ExternalLink), Kind::Secondary).on_press(Message::OpenRepository),
+            ),
+            divider(),
+            setting(
+                "Report a problem",
+                "Opens a bug report on GitHub with your Poof and macOS versions filled in. Nothing is sent until you submit it.",
+                btn("Report…", Some(Icon::ExternalLink), Kind::Secondary).on_press(Message::ReportProblem),
+            ),
+        ]
+        .spacing(gap::L),
+    )
+    .into()
+}
+
 /// A labelled setting with its control on the right.
 fn setting<'a>(
     title: &'a str,
@@ -221,4 +241,39 @@ fn setting<'a>(
     .spacing(gap::XL)
     .align_y(Alignment::Center)
     .into()
+}
+
+/// A new GitHub bug report with the versions already filled in.
+fn issue_url(poof: &str, mac: &str) -> String {
+    format!(
+        "{REPOSITORY}/issues/new?template=bug_report.yml&version={}&macos={}",
+        encode_query(poof),
+        encode_query(mac)
+    )
+}
+
+/// Percent-encodes a URL query value.
+fn encode_query(value: &str) -> String {
+    value
+        .bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => char::from(b).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn issue_url_prefills_the_bug_report() {
+        assert_eq!(
+            issue_url("0.1.2", "macOS 26.4 (Mac16,12)"),
+            format!(
+                "{REPOSITORY}/issues/new?template=bug_report.yml&version=0.1.2&macos=macOS%2026.4%20%28Mac16%2C12%29"
+            )
+        );
+    }
 }

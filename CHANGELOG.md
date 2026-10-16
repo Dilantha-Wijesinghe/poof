@@ -10,6 +10,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - An Empty Trash button on the message that follows moving items to the Trash,
   from Explore or Clean Up.
+- Settings → About has a Report a problem button. It opens a GitHub bug report
+  with the Poof and macOS versions filled in.
 
 ### Changed
 

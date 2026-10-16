@@ -98,6 +98,14 @@ pub fn open_url(url: &str) -> Result<()> {
     run("open", &[url]).map(drop)
 }
 
+/// The macOS version and Mac model, e.g. `macOS 26.4 (Mac16,12)`, for bug
+/// reports. Nothing that identifies the user.
+pub fn describe_mac() -> String {
+    let get =
+        |program, args| run(program, args).map_or_else(|_| "unknown".into(), |out| out.trim().to_owned());
+    format!("macOS {} ({})", get("sw_vers", &["-productVersion"]), get("sysctl", &["-n", "hw.model"]))
+}
+
 /// Shows the native "choose folder" panel. `None` if the user cancelled.
 pub fn choose_folder(prompt: &str) -> Option<std::path::PathBuf> {
     let script = format!("POSIX path of (choose folder with prompt \"{}\")", applescript_escape(prompt));
