@@ -115,13 +115,26 @@ pub fn find(rules: &'static [Rule], options: Options) -> Vec<Finding> {
     let claimed: Vec<PathBuf> = rules.iter().flat_map(|r| roots(r.source)).collect();
     let never = [paths::data_dir(), paths::log_dir()];
 
-    let mut findings: Vec<Finding> = rules
-        .par_iter()
-        .map(|rule| evaluate(rule, options, &claimed, &never))
-        .filter(|f| !f.items.is_empty() || f.unreadable)
-        .collect();
+    let mut findings: Vec<Finding> =
+        rules.par_iter().map(|rule| evaluate(rule, options, &claimed, &never)).collect();
+    drop_nested(&mut findings);
+    findings.retain(|f| !f.items.is_empty() || f.unreadable);
     findings.sort_by_key(|f| std::cmp::Reverse(f.total()));
     findings
+}
+
+/// Removes items that sit inside another rule's item (e.g. an app's web
+/// cache inside that app's leftover folder), so nothing is counted or
+/// deleted twice. The enclosing item is kept.
+fn drop_nested(findings: &mut [Finding]) {
+    let all: Vec<(usize, PathBuf)> = findings
+        .iter()
+        .enumerate()
+        .flat_map(|(i, f)| f.items.iter().map(move |c| (i, c.path.clone())))
+        .collect();
+    for (i, finding) in findings.iter_mut().enumerate() {
+        finding.items.retain(|c| !all.iter().any(|(j, p)| *j != i && c.path != *p && c.path.starts_with(p)));
+    }
 }
 
 fn evaluate(rule: &'static Rule, options: Options, claimed: &[PathBuf], never: &[PathBuf]) -> Finding {
@@ -229,6 +242,33 @@ mod tests {
         assert_eq!(by_id("broad").items.len(), 1, "Homebrew is reported by the specific rule");
         assert!(by_id("broad").items[0].path.ends_with("app"));
         assert!(by_id("specific").items[0].path.ends_with("Homebrew"));
+    }
+
+    #[test]
+    fn items_nested_in_another_rules_item_are_dropped() {
+        let rule = |id| -> &'static Rule {
+            Box::leak(Box::new(Rule {
+                id,
+                name: "",
+                description: "",
+                category: Category::Apps,
+                safety: Safety::Safe,
+                source: Source::Paths(&[]),
+                permanent: false,
+            }))
+        };
+        let item = |p: &str| Candidate { path: PathBuf::from(p), size: 1, modified: 0 };
+        let mut findings = vec![
+            Finding { rule: rule("outer"), items: vec![item("/a/app")], unreadable: false },
+            Finding {
+                rule: rule("inner"),
+                items: vec![item("/a/app/Cache"), item("/a/other")],
+                unreadable: false,
+            },
+        ];
+        drop_nested(&mut findings);
+        assert_eq!(findings[0].items.len(), 1);
+        assert_eq!(findings[1].items, vec![item("/a/other")]);
     }
 
     #[test]

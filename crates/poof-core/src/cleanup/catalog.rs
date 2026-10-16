@@ -33,7 +33,8 @@ pub static CATALOG: &[Rule] = &[
         name: "Trash",
         description: "Items you already moved to the Trash. They still use space until it is emptied.",
         category: Category::System,
-        safety: Safety::Safe,
+        // Not regenerable: emptying the Trash is a deliberate choice.
+        safety: Safety::Review,
         source: Source::Contents(&["~/.Trash"]),
         permanent: true,
     },

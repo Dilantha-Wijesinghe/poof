@@ -225,6 +225,19 @@ mod tests {
         }
     }
 
+    /// Touches the real Trash, so it only runs on demand:
+    /// `cargo test -p poof-core -- --ignored moves_items_to_the_trash`
+    #[test]
+    #[ignore = "moves a temporary file into the user's real Trash"]
+    fn moves_items_to_the_trash() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("poof-trash-selftest.txt");
+        fs::write(&file, b"poof").unwrap();
+        let outcome = remove(&[Item { path: file.clone(), size: 4 }], Method::Trash);
+        assert!(outcome.failed.is_empty(), "{:?}", outcome.failed);
+        assert!(!file.exists());
+    }
+
     #[test]
     fn deletes_files_and_directories_and_reports_failures() {
         let dir = tempfile::tempdir().unwrap();

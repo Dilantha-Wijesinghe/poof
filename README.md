@@ -77,17 +77,23 @@ the opposite:
    [Releases](https://github.com/Dilantha-Wijesinghe/poof/releases/latest). It
    is a universal build for Apple silicon and Intel.
 2. Open the disk image and drag **Poof** to **Applications**.
-3. Poof is not notarized by Apple yet, so Gatekeeper will block the first
-   launch. Either right-click Poof → **Open** → **Open**, or run:
+3. Poof is not notarized by Apple yet, so Gatekeeper blocks the first launch.
+   Either run:
 
    ```sh
    xattr -dr com.apple.quarantine /Applications/Poof.app
    ```
 
+   or try to open Poof once, then go to System Settings → Privacy & Security
+   and click **Open Anyway**. On macOS 14 and earlier, right-click → **Open**
+   also works.
+
 4. For complete results, grant **Full Disk Access**: System Settings → Privacy
    & Security → Full Disk Access → add Poof. Poof links you straight there.
    Without it, Mail, Messages, Safari, the Trash and other apps' data can't be
-   measured.
+   measured. Until Poof is signed with a Developer ID, macOS may forget this
+   permission after an update. If the banner comes back, toggle Poof off and
+   on again in that list.
 
 Verify a download with the `SHA256SUMS.txt` attached to each release.
 
