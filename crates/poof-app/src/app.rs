@@ -64,7 +64,7 @@ impl App {
         let monitor_task = sync_monitor(&settings);
         let update_task = updater::startup_check(settings.check_for_updates);
 
-        let app = Self {
+        let mut app = Self {
             screen: Screen::Overview,
             shared: Shared { settings, full_disk_access: mac::has_full_disk_access(), ..Shared::default() },
             system_dark: false,
@@ -75,6 +75,10 @@ impl App {
             updater: updater::State::default(),
             toast: None,
         };
+        if let Some(from) = poof_core::update::take_update_note() {
+            let current = poof_core::update::Version::current();
+            app.show_toast(format!("Updated to Poof {current} (from {from})."), Tone::Success);
+        }
         let boot = Task::batch([
             system::theme().map(Message::SystemTheme),
             refresh_disk(),

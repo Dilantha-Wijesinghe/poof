@@ -89,7 +89,8 @@ impl State {
             }
             Message::Install => self.install(),
             Message::Installed(Ok(bundle)) => {
-                // Start the new version once this one has quit.
+                // Start the new version once this one has quit; it confirms the update.
+                update::remember_update(Version::current());
                 match update::relaunch(&bundle, std::process::id()) {
                     Ok(()) => Action::task(iced::exit()),
                     Err(e) => Action::event(Event::Toast(

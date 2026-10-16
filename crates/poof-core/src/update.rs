@@ -232,6 +232,35 @@ fn replace(current: &Path, new: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Records the version that was running before an update, so the new version
+/// can confirm the update when it starts.
+pub fn remember_update(from: Version) {
+    remember_in(&note_path(), from);
+}
+
+/// If this launch is the first after an update, returns the version updated
+/// from. Consumes the note, so it is reported once.
+pub fn take_update_note() -> Option<Version> {
+    take_from(&note_path(), Version::current())
+}
+
+fn note_path() -> PathBuf {
+    crate::paths::data_dir().join("updated-from")
+}
+
+fn remember_in(path: &Path, from: Version) {
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    let _ = fs::write(path, from.to_string());
+}
+
+fn take_from(path: &Path, current: Version) -> Option<Version> {
+    let text = fs::read_to_string(path).ok()?;
+    let _ = fs::remove_file(path);
+    Version::parse(&text).filter(|&from| from < current)
+}
+
 /// Opens `bundle` again as soon as the process `pid` has exited.
 pub fn relaunch(bundle: &Path, pid: u32) -> Result<()> {
     Command::new("/bin/sh")
@@ -404,6 +433,18 @@ mod tests {
 
         assert!(install_with_key(&release, &installed, &public).is_err());
         assert_eq!(installed_version(&installed).trim(), "0.1.0");
+    }
+
+    #[test]
+    fn the_update_note_is_reported_once_and_only_for_upgrades() {
+        let dir = tempfile::tempdir().unwrap();
+        let note = dir.path().join("nested/updated-from");
+        remember_in(&note, Version(0, 1, 0));
+        assert_eq!(take_from(&note, Version(0, 1, 1)), Some(Version(0, 1, 0)));
+        assert_eq!(take_from(&note, Version(0, 1, 1)), None, "consumed");
+
+        remember_in(&note, Version(0, 2, 0));
+        assert_eq!(take_from(&note, Version(0, 1, 1)), None, "not an upgrade");
     }
 
     #[test]
