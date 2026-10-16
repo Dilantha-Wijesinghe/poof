@@ -88,6 +88,8 @@ impl App {
             toast: None,
         };
         let current = poof_core::update::Version::current();
+        // Consuming the note tells the previous version this one started, so
+        // it doesn't roll the update back. Keep it early in startup.
         if let Some(from) = poof_core::update::take_update_note() {
             app.show_toast(format!("Updated to Poof {current} (from {from})."), Tone::Success);
         }

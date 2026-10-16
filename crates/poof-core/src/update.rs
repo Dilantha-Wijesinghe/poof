@@ -283,6 +283,9 @@ pub fn take_failed_update() -> Option<Version> {
     take_from(&failed_note_path())
 }
 
+/// The check-in between versions: the old version writes this note, and the
+/// new one consumes it at startup ([`take_update_note`]). Releases already
+/// out there rely on its name and place, so never change them.
 fn note_path() -> PathBuf {
     crate::paths::data_dir().join("updated-from")
 }
@@ -340,8 +343,11 @@ pub fn finish_update(pid: u32, bundle: &Path) -> Result<()> {
 }
 
 /// Opens `bundle` and waits for it to consume `note` (see
-/// [`take_update_note`]). On success the backup is removed; otherwise the
-/// backup replaces `bundle` and the failed version is written to `failed_note`.
+/// [`take_update_note`]). On success the backup is removed. If the note is
+/// still there and nothing runs from `bundle`, the new version failed to
+/// start: the backup replaces `bundle` and the failed version is written to
+/// `failed_note`. A version that runs but never checks in is kept, since
+/// rolling back a working update would be worse.
 fn watch_first_launch(
     bundle: &Path,
     note: &Path,
@@ -350,12 +356,11 @@ fn watch_first_launch(
     open: impl Fn(&Path) -> Result<()>,
 ) -> Result<()> {
     let backup = backup_of(bundle);
-    if open(bundle).is_ok() && wait_until(timeout, || !note.exists()) {
+    let opened = open(bundle).is_ok();
+    if opened && (wait_until(timeout, || !note.exists()) || runs_from(bundle)) {
         return fs::remove_dir_all(&backup).map_err(Error::io("remove", &backup));
     }
     let failed = bundle_version(bundle);
-    // Stop the new version in case it hangs rather than crashed.
-    let _ = system::run("pkill", &["-f", &bundle.join("Contents/MacOS/").to_string_lossy()]);
     let broken = beside(bundle, "failed");
     let _ = fs::remove_dir_all(&broken);
     fs::rename(bundle, &broken).map_err(Error::io("move", bundle))?;
@@ -366,6 +371,12 @@ fn watch_first_launch(
         remember_in(failed_note, version);
     }
     open(bundle)
+}
+
+/// Whether any process runs an executable from inside `bundle`.
+fn runs_from(bundle: &Path) -> bool {
+    let executables = format!("{}/Contents/MacOS/", bundle.display());
+    system::run("ps", &["-axo", "command="]).is_ok_and(|out| out.lines().any(|l| l.contains(&executables)))
 }
 
 /// Polls `done` until it holds or `timeout` passes. Returns whether it held.
@@ -599,6 +610,12 @@ mod tests {
 
         assert!(install_with_key(&release, &installed, &public).is_err());
         assert_eq!(installed_version(&installed).trim(), "0.1.0");
+    }
+
+    #[test]
+    fn the_check_in_note_keeps_its_name() {
+        // Older versions wait for exactly this file; see `note_path`.
+        assert!(note_path().ends_with("io.github.dilantha-wijesinghe.poof/updated-from"));
     }
 
     #[test]

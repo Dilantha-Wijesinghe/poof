@@ -44,8 +44,11 @@ impl App {
     }
 }
 
-/// Apps with a Dock icon that are open now, except Poof itself. Background
-/// helpers and daemons are left out: the user can't quit them.
+/// Apps that are always open and can't be quit.
+const ALWAYS_OPEN: &[&str] = &["com.apple.finder"];
+
+/// Apps with a Dock icon that are open now, except Poof itself and Finder.
+/// Background helpers and daemons are left out: the user can't quit them.
 pub fn running() -> Vec<App> {
     let me = std::process::id().cast_signed();
     NSWorkspace::sharedWorkspace()
@@ -60,6 +63,7 @@ pub fn running() -> Vec<App> {
                 path: a.bundleURL()?.to_file_path()?,
             })
         })
+        .filter(|app| !ALWAYS_OPEN.contains(&app.id.as_str()))
         .collect()
 }
 
