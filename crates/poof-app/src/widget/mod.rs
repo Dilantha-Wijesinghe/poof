@@ -121,16 +121,28 @@ pub fn empty_state<'a, M: Clone + 'a>(
 
 /// A button with an optional leading icon.
 pub fn btn<'a, M: Clone + 'a>(content: &'a str, icon: Option<Icon>, kind: Kind) -> Button<'a, M> {
+    button(btn_label(content, icon, kind)).padding([7, 14]).style(style::button(kind))
+}
+
+/// Like [`btn`], but filling the available width with its label centred.
+pub fn wide_btn<'a, M: Clone + 'a>(content: &'a str, icon: Option<Icon>, kind: Kind) -> Button<'a, M> {
+    button(container(btn_label(content, icon, kind)).center_x(Fill))
+        .width(Fill)
+        .padding([7, 14])
+        .style(style::button(kind))
+}
+
+fn btn_label<'a, M: 'a>(content: &'a str, icon: Option<Icon>, kind: Kind) -> Element<'a, M> {
     let tint = match kind {
         Kind::Primary | Kind::Destructive => style::icon(|t| t.on_accent),
         Kind::Secondary | Kind::Ghost => style::icon(|t| t.text),
     };
-    let inner = row![]
+    row![]
         .push(icon.map(|i| i.view(15).style(tint)))
         .push(text(content).size(size::BODY).font(font::MEDIUM))
         .spacing(gap::S)
-        .align_y(Alignment::Center);
-    button(inner).padding([7, 14]).style(style::button(kind))
+        .align_y(Alignment::Center)
+        .into()
 }
 
 /// A square, icon-only ghost button with a hover tooltip.

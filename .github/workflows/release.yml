@@ -67,9 +67,14 @@ jobs:
       - name: Extract release notes from CHANGELOG.md
         run: |
           version="${GITHUB_REF_NAME#v}"
+          # Wrapped bullets are joined onto one line: Poof 0.1.0 and 0.1.1 show only
+          # the first line of each bullet in their update dialog.
           awk -v v="$version" '
             /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
-            found { print }
+            !found { next }
+            bullet && /^[ \t]+[^ \t]/ && !/^[ \t]*[-*] / { sub(/^[ \t]+/, ""); line = line " " $0; next }
+            { if (held) print line; line = $0; held = 1; bullet = /^[ \t]*[-*] / }
+            END { if (held) print line }
           ' CHANGELOG.md > notes.md
           cat >> notes.md <<'NOTES'
 

@@ -12,7 +12,7 @@ use crate::icon::Icon;
 use crate::screen::{Action, Event};
 use crate::style::{self, Kind, Tone, space as gap};
 use crate::task;
-use crate::widget::{Dialog, btn, caption, label};
+use crate::widget::{Dialog, caption, label, wide_btn};
 
 #[derive(Debug, Clone, Default)]
 pub enum Status {
@@ -162,7 +162,7 @@ impl State {
                 .align_y(Alignment::Center),
             caption("A new version is ready to install."),
             space().height(2),
-            btn("Update", None, Kind::Primary).on_press_maybe(action).width(Fill),
+            wide_btn("Update", None, Kind::Primary).on_press_maybe(action),
         ]
         .spacing(gap::XS);
         Some(container(content).padding(gap::M).width(Fill).style(style::banner(Tone::Accent)).into())

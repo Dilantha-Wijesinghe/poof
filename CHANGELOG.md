@@ -10,6 +10,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The update dialog now shows release notes that wrap over several lines in
   full, instead of cutting them off.
+- The sidebar's Update button now centres its label.
 
 ## [0.1.1] - 2026-10-16
 
