@@ -64,13 +64,25 @@ pub struct Release {
 
 impl Release {
     /// Up to `limit` bullet points from the release notes, as plain text.
+    /// Bullets wrapped over several lines are joined back together.
     pub fn highlights(&self, limit: usize) -> Vec<String> {
-        self.notes
-            .lines()
-            .filter_map(|line| line.trim_start().strip_prefix("- "))
-            .map(|line| line.replace("**", "").replace('`', ""))
-            .take(limit)
-            .collect()
+        let mut items: Vec<String> = Vec::new();
+        let mut open = false; // the last line belonged to a bullet
+        for line in self.notes.lines() {
+            let trimmed = line.trim();
+            if let Some(item) = trimmed.strip_prefix("- ") {
+                items.push(item.to_owned());
+                open = true;
+            } else if open && !trimmed.is_empty() && line.starts_with(char::is_whitespace) {
+                if let Some(last) = items.last_mut() {
+                    last.push(' ');
+                    last.push_str(trimmed);
+                }
+            } else {
+                open = false;
+            }
+        }
+        items.into_iter().take(limit).map(|item| item.replace("**", "").replace('`', "")).collect()
     }
 }
 
@@ -306,6 +318,19 @@ mod tests {
         assert_eq!(release.archive, "https://x/Poof-0.2.0.zip");
         assert_eq!(release.signature, "https://x/Poof-0.2.0.zip.minisig");
         assert_eq!(release.highlights(5), ["Clean Up: a new rule", "Faster scans"]);
+    }
+
+    #[test]
+    fn wrapped_bullets_are_joined() {
+        let notes = "### Fixed\n\n- Builds now lint cleanly on Rust 1.99, and the toolchain is pinned so local\n  builds and CI always agree.\n- Second item\n\nNot a bullet\n  nor this\n";
+        let release = Release { notes: notes.into(), ..parse_release(RELEASE_JSON).unwrap().unwrap() };
+        assert_eq!(
+            release.highlights(5),
+            [
+                "Builds now lint cleanly on Rust 1.99, and the toolchain is pinned so local builds and CI always agree.",
+                "Second item"
+            ]
+        );
     }
 
     #[test]

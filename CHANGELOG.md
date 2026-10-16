@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The update dialog now shows release notes that wrap over several lines in
+  full, instead of cutting them off.
+
 ## [0.1.1] - 2026-10-16
 
 ### Added
