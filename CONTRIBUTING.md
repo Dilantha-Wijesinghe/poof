@@ -83,12 +83,15 @@ accept updates signed with the key they shipped with.
 
 **Each release:**
 
-1. Bump `version` in the root `Cargo.toml` (`[workspace.package]`) and run
-   `cargo check` to refresh `Cargo.lock`.
+1. On a branch, bump `version` in the root `Cargo.toml` (`[workspace.package]`)
+   and the matching `poof-core` version under `[workspace.dependencies]`, then
+   run `cargo check` to refresh `Cargo.lock`.
 2. Update `CHANGELOG.md` (`git cliff --unreleased --tag vX.Y.Z --prepend CHANGELOG.md`
    helps), then commit with `chore(release): vX.Y.Z`.
-3. Tag and push: `git tag -a vX.Y.Z -m "Poof vX.Y.Z" && git push --follow-tags`.
-4. The **Release** workflow builds and signs the universal app, signs the
+3. `main` only accepts pull requests that pass CI, so open one and merge it.
+4. Tag the merged commit and push the tag:
+   `git switch main && git pull && git tag -a vX.Y.Z -m "Poof vX.Y.Z" && git push origin vX.Y.Z`.
+5. The **Release** workflow builds and signs the universal app, signs the
    update archive, creates the GitHub release with that version's changelog
    section, and attaches the `.dmg`, `.zip`, `.zip.minisig` and
    `SHA256SUMS.txt`. Installed copies of Poof pick the update up within a day.
