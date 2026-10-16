@@ -29,8 +29,19 @@ jobs:
       - name: Test
         run: cargo test --workspace --locked
 
+      # The upstream prebuilt binary, pinned by checksum. Building it from
+      # source with `cargo install` took about four minutes.
       - name: Install rcodesign
-        run: cargo install apple-codesign --version 0.29.0 --locked
+        env:
+          RCODESIGN_VERSION: 0.29.0
+          RCODESIGN_SHA256: d98372d5524226ccf9dc0eda03d4e4f5826182dabb2fc3f2bd303ed9113a748d
+        run: |
+          name="apple-codesign-$RCODESIGN_VERSION-macos-universal"
+          curl -fsSL -o "$RUNNER_TEMP/$name.tar.gz" \
+            "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F$RCODESIGN_VERSION/$name.tar.gz"
+          echo "$RCODESIGN_SHA256  $RUNNER_TEMP/$name.tar.gz" | shasum -a 256 -c -
+          tar -xzf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
 
       # Signing with Poof's own certificate keeps the app's identity stable, so
       # macOS remembers Full Disk Access across updates. Never ship without it.
