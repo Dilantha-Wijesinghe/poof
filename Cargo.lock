@@ -2310,7 +2310,7 @@ dependencies = [
 
 [[package]]
 name = "poof"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "iced",
  "poof-core",
@@ -2318,7 +2318,7 @@ dependencies = [
 
 [[package]]
 name = "poof-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "jiff",
  "minisign",

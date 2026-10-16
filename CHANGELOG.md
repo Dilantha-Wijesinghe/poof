@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-16
+
+### Added
+
+- After updating itself, Poof confirms the new version when it reopens.
+
+### Fixed
+
+- Builds now lint cleanly on Rust 1.99, and the toolchain is pinned so local
+  builds and CI always agree.
+
 ## [0.1.0] - 2026-10-16
 
 ### Added
@@ -51,5 +62,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A universal (Apple silicon + Intel) `.app`, `.dmg` and `.zip` via
   `scripts/bundle.sh` and GitHub Actions.
 
-[Unreleased]: https://github.com/Dilantha-Wijesinghe/poof/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Dilantha-Wijesinghe/poof/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Dilantha-Wijesinghe/poof/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Dilantha-Wijesinghe/poof/releases/tag/v0.1.0

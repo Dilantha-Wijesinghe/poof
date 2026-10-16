@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/poof-core", "crates/poof-app", "xtask"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
@@ -14,7 +14,7 @@ keywords = ["macos", "disk-usage", "cleaner", "storage", "treemap"]
 categories = ["filesystem", "command-line-utilities"]
 
 [workspace.dependencies]
-poof-core = { path = "crates/poof-core", version = "0.1.0" }
+poof-core = { path = "crates/poof-core", version = "0.1.1" }
 iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "smol", "canvas", "svg", "advanced"] }
 jiff = "0.2"
 minisign = "0.10"
