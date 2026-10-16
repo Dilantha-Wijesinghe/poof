@@ -1,0 +1,11 @@
+name: Feature request or new cleanup target
+description: Suggest an idea, or a location Poof should know about
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: For a new cleanup target, include the path, what creates it, and whether it is safely regenerated.
+    validations:
+      required: true
