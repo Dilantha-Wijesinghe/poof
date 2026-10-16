@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- An Empty Trash button on the message that follows moving items to the Trash,
+  from Explore or Clean Up.
+
 ### Changed
 
 - Clean Up leaves out the data of apps that are open, such as a running

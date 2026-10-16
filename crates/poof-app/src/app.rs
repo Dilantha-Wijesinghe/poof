@@ -12,9 +12,9 @@ use poof_core::{monitor, system as mac, volume};
 
 use crate::icon::Icon;
 use crate::screen::{Action, Event, Screen, Shared, changes, cleanup, explore, overview, settings};
-use crate::style::{self, Tone, size, space as gap};
-use crate::widget::{self, caption};
-use crate::{font, task, updater};
+use crate::style::{self, Kind, Tone, size, space as gap};
+use crate::widget::{self, btn, caption};
+use crate::{font, task, trash, updater};
 
 #[derive(Debug)]
 pub struct App {
@@ -26,6 +26,7 @@ pub struct App {
     cleanup: cleanup::State,
     changes: changes::State,
     updater: updater::State,
+    trash: trash::State,
     toast: Option<Toast>,
 }
 
@@ -34,9 +35,16 @@ struct Toast {
     message: String,
     tone: Tone,
     shown: Instant,
+    /// A button label and what it does.
+    action: Option<(&'static str, Message)>,
 }
 
-const TOAST_DURATION: Duration = Duration::from_secs(5);
+impl Toast {
+    /// How long the toast stays up; longer when it offers an action.
+    fn duration(&self) -> Duration {
+        Duration::from_secs(if self.action.is_some() { 10 } else { 5 })
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -53,6 +61,9 @@ pub enum Message {
     Changes(changes::Message),
     Settings(settings::Message),
     Updater(updater::Message),
+    Trash(trash::Message),
+    /// The toast's button was pressed.
+    ToastAction,
 }
 
 impl App {
@@ -73,6 +84,7 @@ impl App {
             cleanup,
             changes,
             updater: updater::State::default(),
+            trash: trash::State::default(),
             toast: None,
         };
         if let Some(from) = poof_core::update::take_update_note() {
@@ -148,7 +160,7 @@ impl App {
                 Task::none()
             }
             Message::Tick => {
-                if self.toast.as_ref().is_some_and(|t| t.shown.elapsed() > TOAST_DURATION) {
+                if self.toast.as_ref().is_some_and(|t| t.shown.elapsed() > t.duration()) {
                     self.toast = None;
                 }
                 Task::none()
@@ -177,6 +189,14 @@ impl App {
                 let action = settings::update(m, &self.shared.settings);
                 self.handle(action, Message::Settings)
             }
+            Message::Trash(m) => {
+                let action = self.trash.update(m);
+                self.handle(action, Message::Trash)
+            }
+            Message::ToastAction => match self.toast.take().and_then(|t| t.action) {
+                Some((_, message)) => self.update(message),
+                None => Task::none(),
+            },
         }
     }
 
@@ -199,15 +219,14 @@ impl App {
             Event::Removed { bytes, trashed, failed } => {
                 let message = match (trashed, failed) {
                     (true, 0) => {
-                        format!(
-                            "Moved {} to the Trash. Empty the Trash to get the space back.",
-                            ByteSize(bytes)
-                        )
+                        format!("Moved {} to the Trash. Empty it to get the space back.", ByteSize(bytes))
                     }
                     (false, 0) => format!("Freed {}.", ByteSize(bytes)),
                     (_, n) => format!("Removed {}. {n} item(s) couldn't be removed.", ByteSize(bytes)),
                 };
-                self.show_toast(message, if failed == 0 { Tone::Success } else { Tone::Warning });
+                let tone = if failed == 0 { Tone::Success } else { Tone::Warning };
+                let empty_trash = ("Empty Trash", Message::Trash(trash::Message::Ask));
+                self.show_toast_with(message, tone, (trashed && bytes > 0).then_some(empty_trash));
                 Task::batch([
                     refresh_disk(),
                     self.cleanup.refresh(&self.shared.settings).map(Message::Cleanup),
@@ -254,7 +273,11 @@ impl App {
     }
 
     fn show_toast(&mut self, message: String, tone: Tone) {
-        self.toast = Some(Toast { message, tone, shown: Instant::now() });
+        self.show_toast_with(message, tone, None);
+    }
+
+    fn show_toast_with(&mut self, message: String, tone: Tone, action: Option<(&'static str, Message)>) {
+        self.toast = Some(Toast { message, tone, shown: Instant::now(), action });
     }
 
     // ------------------------------------------------------------------ view
@@ -283,6 +306,7 @@ impl App {
             Screen::Cleanup => self.cleanup.dialog().map(|d| d.map(Message::Cleanup)),
             _ => None,
         }
+        .or_else(|| self.trash.dialog().map(|d| d.map(Message::Trash)))
         .or_else(|| self.updater.dialog().map(|d| d.map(Message::Updater)));
         widget::modal(layout, dialog)
     }
@@ -396,6 +420,12 @@ fn toast_view(toast: &Toast) -> Element<'_, Message> {
             icon.view(16).style(style::icon_tone(tone)),
             text(&toast.message).size(size::BODY).font(font::MEDIUM)
         ]
+        .push(
+            toast
+                .action
+                .as_ref()
+                .map(|(label, _)| btn(label, None, Kind::Primary).on_press(Message::ToastAction)),
+        )
         .spacing(gap::S)
         .align_y(Alignment::Center),
     )

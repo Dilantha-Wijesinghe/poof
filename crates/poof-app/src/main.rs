@@ -9,6 +9,7 @@ mod icon;
 mod screen;
 mod style;
 mod task;
+mod trash;
 mod updater;
 mod widget;
 

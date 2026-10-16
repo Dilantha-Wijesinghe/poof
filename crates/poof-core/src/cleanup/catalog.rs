@@ -7,6 +7,7 @@
 //! the more specific rule wins automatically — see [`super::find`].
 
 use super::{Category, Rule, Safety, Source};
+use crate::paths::TRASH;
 
 pub static CATALOG: &[Rule] = &[
     // ----------------------------------------------------------------- System
@@ -35,7 +36,7 @@ pub static CATALOG: &[Rule] = &[
         category: Category::System,
         // Not regenerable: emptying the Trash is a deliberate choice.
         safety: Safety::Review,
-        source: Source::Contents(&["~/.Trash"]),
+        source: Source::Contents(&[TRASH]),
         permanent: true,
     },
     Rule {

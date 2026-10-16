@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 
 use objc2_foundation::{NSFileManager, NSString, NSURL};
 
-use crate::{Error, Result, paths, size::ByteSize};
+use crate::{Error, Result, paths, scan, size::ByteSize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
@@ -51,6 +51,25 @@ pub fn remove(items: &[Item], method: Method) -> Outcome {
         }
     }
     outcome
+}
+
+/// Permanently deletes everything in the user's Trash. Blocking. Fails if
+/// the Trash can't be read, which usually means no Full Disk Access.
+pub fn empty_trash() -> Result<Outcome> {
+    empty(&paths::expand(paths::TRASH))
+}
+
+/// Permanently deletes everything inside `dir`, keeping `dir` itself.
+fn empty(dir: &Path) -> Result<Outcome> {
+    let items: Vec<Item> = fs::read_dir(dir)
+        .map_err(Error::io("read", dir))?
+        .flatten()
+        .map(|entry| {
+            let path = entry.path();
+            Item { size: scan::measure(&path), path }
+        })
+        .collect();
+    Ok(remove(&items, Method::Delete))
 }
 
 fn remove_one(path: &Path, method: Method) -> Result<()> {
@@ -257,5 +276,20 @@ mod tests {
         assert_eq!(outcome.removed.len(), 2);
         assert_eq!(outcome.failed.len(), 1);
         assert!(!file.exists() && !folder.exists());
+    }
+
+    #[test]
+    fn emptying_a_folder_keeps_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("a.bin"), b"hello").unwrap();
+        fs::create_dir_all(dir.path().join("folder")).unwrap();
+        fs::write(dir.path().join("folder/b.bin"), b"x").unwrap();
+
+        let outcome = empty(dir.path()).unwrap();
+        assert_eq!(outcome.removed.len(), 2);
+        assert!(outcome.failed.is_empty(), "{:?}", outcome.failed);
+        assert!(dir.path().is_dir());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+        assert!(empty(&dir.path().join("missing")).is_err());
     }
 }

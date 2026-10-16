@@ -11,6 +11,9 @@ use crate::{APP_ID, APP_NAME};
 /// `/Applications` etc. are firmlinks into this volume.
 pub const DATA_VOLUME: &str = "/System/Volumes/Data";
 
+/// The user's Trash on the boot volume.
+pub const TRASH: &str = "~/.Trash";
+
 /// The current user's home directory.
 pub fn home() -> PathBuf {
     std::env::var_os("HOME").filter(|h| !h.is_empty()).map_or_else(|| PathBuf::from("/"), PathBuf::from)
