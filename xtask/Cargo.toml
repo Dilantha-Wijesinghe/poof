@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 minisign.workspace = true
-resvg = "0.45"
+resvg = "0.49"
 
 [lints]
 workspace = true
