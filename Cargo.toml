@@ -16,7 +16,7 @@ categories = ["filesystem", "command-line-utilities"]
 [workspace.dependencies]
 poof-core = { path = "crates/poof-core", version = "0.1.2" }
 iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "smol", "canvas", "svg", "advanced"] }
-jiff = "0.2"
+jiff = "1.0"
 minisign = "0.10"
 minisign-verify = "0.3"
 rayon = "1.11"
